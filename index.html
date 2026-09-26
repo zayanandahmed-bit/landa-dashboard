@@ -92,8 +92,12 @@ details[open] summary{margin-bottom:12px}
 .gbtn small{font-size:11px;opacity:.85}
 .g-A{background:#15803d}.g-B{background:#1d4ed8}.g-C{background:#b45309}.g-Reject{background:#6b7280}.undo{background:#111827}
 .g{display:inline-block;min-width:26px;text-align:center;border-radius:6px;color:#fff;font-weight:700;padding:1px 6px;font-size:12px}
+.brandmode{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.brandmode:not(.on){display:block}
+.brandmode.on{border:2px solid var(--brand);background:#f0fdfa}
 .flash{animation:flash .6s}
 @keyframes flash{from{background:#fef08a}to{background:transparent}}
+.btn.big{font-size:17px;padding:14px 20px}
 .brandbtns{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px}
 .bigpiece{font-size:15px;margin:0}
 #lock{position:fixed;inset:0;background:#111827;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
@@ -247,7 +251,7 @@ async function loadAll() {
     orders: orders.map(o => byOrder[o.id] = {id: o.id, date: o.order_date, customerId: o.customer_id, status: o.status, paid: +o.paid,
       courier: o.courier, tracking: o.tracking, history: o.history || [], lines: []}),
     log: log.map(l => ({d: l.happened_on, t: l.message})),
-    live: {baleId: liveRow?.bale_id || null, category: liveRow?.category || null},
+    live: {baleId: liveRow?.bale_id || null, category: liveRow?.category || null, brand: liveRow?.brand || null, brandReady: !!liveRow && 'brand' in liveRow},
     brands, devices, pending, recent,
   };
   yields.forEach(y => { if (byBale[y.bale_id]) byBale[y.bale_id].yield[y.category + '|' + y.grade] = y.qty; });
@@ -535,12 +539,23 @@ PAGES.sorting = id => {
     <div id="sortSum" class="muted"></div>
     <div class="btns"><label class="muted"><input type="checkbox" name="finish" data-nokeep checked> finish bale after adding</label><button class="btn" type="submit">Add to stock</button></div></div></form></details>`;
 };
+function brandBar() {
+  if (!S.live.brandReady) return '<div class="alert a-warn"><span class="dot"></span><span><b>Brand mode needs one database step</b>Run <code>supabase/004_brand_mode.sql</code> in the Supabase SQL editor, then refresh.</span></div>';
+  const cur = S.live.brand;
+  const top = S.brands.filter(x => x.brand !== 'No brand').slice(0, 14);
+  if (cur) return `<div class="brandmode on"><div><b>🏷 Brand mode: ${esc(cur)}</b><div class="muted">Every piece you count is tagged <b>${esc(cur)}</b> automatically — the popup only asks for the category.</div></div>
+    <div class="btns"><button class="btn ghost sm" data-act="newBrandMode">Change brand</button><button class="btn red sm" data-act="brandModeOff">Turn off</button></div></div>`;
+  return `<div class="brandmode"><div><b>🏷 Sorting one brand?</b> <span class="muted">Pick it once — no need to choose the brand for every piece.</span></div>
+    <div class="brandbtns" style="margin:8px 0 0">${top.map(x => `<button class="btn ghost sm" data-act="setBrandMode" data-id="${esc(x.brand)}">${esc(x.brand)}</button>`).join('')}
+    <button class="btn sm" data-act="newBrandMode">＋ Other brand…</button></div></div>`;
+}
 function livePanel(b) {
   const y = b.yield, byGrade = g => sum(Object.entries(y).filter(([k]) => k.endsWith('|' + g)), e => e[1]);
   const dev = S.devices.length
     ? S.devices.map(d => { const fresh = d.last_seen && Date.now() - new Date(d.last_seen) < 10 * 60e3; return `<span class="pill ${fresh ? 'p-delivered' : 'p-cancelled'}">📡 ${esc(d.name)} · ${d.last_seen ? 'last count ' + since(d.last_seen) : 'not connected yet'}</span>`; }).join(' ')
     : '<span class="muted">No sensor box connected yet — use the buttons, or keys <b>A B C R</b> (U = undo)</span>';
   return `<div class="liverow"><div>${dev}</div></div>
+  ${brandBar()}
   <div class="counters">${GRADES.map(g => `<button class="gbtn g-${g}" data-act="piece" data-id="${g}"><span>${g === 'Reject' ? 'Reject' : 'Grade ' + g}</span><b>${num(byGrade(g))}</b><small>+1 piece</small></button>`).join('')}
     <button class="gbtn undo" data-act="undo"><span>Undo</span><b>↶</b><small>remove last piece</small></button></div>
   <h2>Latest pieces ${S.pending.length ? `<span class="pill p-packed">${S.pending.length} waiting for category / brand</span>` : ''}</h2>
@@ -591,32 +606,34 @@ function maybeBrandPopup() {
 let lastCat = null;
 function openBrand(p, edit) {
   brandShowing = p.id ?? p;
-  let cat = p.category || lastCat || '';
+  const mode = !edit && S.live.brand ? S.live.brand : null;   // brand mode: brand is already decided
+  let cat = p.category || (mode ? '' : lastCat) || '';
   const quick = S.brands.filter(b => b.brand !== 'No brand').slice(0, 12);
   const no = `<span id="pieceNo">${p.id ?? '…'}</span>`;
-  const f = modal(`Piece #${no} — category & brand`, `
-    <p class="bigpiece"><span class="g g-${p.grade}">${p.grade}</span> bale ${p.bale_id} · ${clock(p.created_at)}
+  const catBtns = `<div class="brandbtns" id="catBtns">${S.categories.map(c => `<button type="button" class="btn ${mode ? 'big ' : ''}${c === cat ? '' : 'ghost'}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>`;
+  const f = modal(mode ? `Piece #${no} — which category?` : `Piece #${no} — category & brand`, `
+    <p class="bigpiece"><span class="g g-${p.grade}">${p.grade}</span> ${mode ? `<span class="pill p-delivered">🏷 ${esc(mode)}</span>` : ''} bale ${p.bale_id} · ${clock(p.created_at)}
       <span class="pill p-packed" id="waiting">${!edit && S.pending.length > 1 ? `${S.pending.length - 1} more waiting` : ''}</span></p>
-    <label style="margin:12px 0 0">Category</label>
-    <div class="brandbtns" id="catBtns">${S.categories.map(c => `<button type="button" class="btn ${c === cat ? '' : 'ghost'}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    ${mode ? `<label style="margin:12px 0 0">Tap the category to save</label>${catBtns}` : `<label style="margin:12px 0 0">Category</label>${catBtns}
     <label style="margin:0">Brand <span style="font-weight:400">— tap one to save</span></label>
     <div class="brandbtns">${quick.map(b => `<button type="button" class="btn ghost" data-brand="${esc(b.brand)}">${esc(b.brand)}</button>`).join('')}
       <button type="button" class="btn ghost" data-brand="No brand" style="border-style:dashed">No brand / skip</button></div>
     <label>Or type a brand<input name="brand" list="brandlist" placeholder="Type a brand and press Enter" autocomplete="off" value="${esc(p.brand || '')}"></label>
-    <datalist id="brandlist">${S.brands.map(b => `<option value="${esc(b.brand)}">`).join('')}</datalist>`,
+    <datalist id="brandlist">${S.brands.map(b => `<option value="${esc(b.brand)}">`).join('')}</datalist>`}`,
     async f => {
       if (!cat) return 'Tap a category first';
-      const v = f.brand.value.trim();
+      const v = mode || f.brand.value.trim();
       if (!v) return 'Tap a brand, type one, or press "No brand / skip"';
       const id = p.id ?? await p.idPromise;
       await rpc('set_piece_details', {p_piece: id, p_category: cat, p_brand: v});
-      lastCat = cat;
-    }, 'Save', 'brand');
+      if (!mode) lastCat = cat;
+    }, mode ? 'Save' : 'Save', 'brand');
   $('#modal').dataset.edit = edit ? '1' : '';
   f.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => {
     cat = b.dataset.cat;
     f.querySelectorAll('[data-cat]').forEach(x => x.classList.toggle('ghost', x !== b));
     f.querySelector('.err').textContent = '';
+    if (mode) f.requestSubmit();          // brand mode: one tap = done
   });
   f.querySelectorAll('[data-brand]').forEach(b => b.onclick = () => { f.brand.value = b.dataset.brand; f.requestSubmit(); });
   f.querySelector('[data-close]').addEventListener('click', () => {
@@ -844,6 +861,18 @@ const ACT = {
       <label>Credit limit (Rs, 0 = none)<input type="number" name="limit" min="0" value="${c.limit || 0}"></label>`,
       async f => { await rpc('save_customer', {p_id: id || null, p_name: f.name.value, p_city: f.city.value, p_phone: f.phone.value.replace(/\D/g, ''), p_limit: +f.limit.value || 0}); });
   },
+  async setBrandMode(brand) {
+    await q(tb('live_sorting_session').update({brand, updated_at: new Date().toISOString()}).eq('id', 1));
+    S.live.brand = brand; toast(`Brand mode ON — every piece is tagged ${brand}`); refresh();
+  },
+  async newBrandMode() {
+    const v = (prompt('Brand you are sorting now (e.g. Levi\'s):', S.live.brand || '') || '').trim();
+    if (v) return ACT.setBrandMode(v);
+  },
+  async brandModeOff() {
+    await q(tb('live_sorting_session').update({brand: null, updated_at: new Date().toISOString()}).eq('id', 1));
+    S.live.brand = null; toast('Brand mode off'); refresh();
+  },
   async goLive(id) {
     await q(tb('live_sorting_session').update({bale_id: id, category: null, updated_at: new Date().toISOString()}).eq('id', 1));
     toast(`${id} is now live — sensor boxes count into it`); refresh();
@@ -853,7 +882,7 @@ const ACT = {
     beep();
     const n = $(`.gbtn[data-id="${grade}"] b`);
     if (n) n.textContent = num((+n.textContent.replace(/\D/g, '') || 0) + 1);
-    const p = {id: null, grade, category: null, bale_id: S.live.baleId, created_at: new Date().toISOString()};
+    const p = {id: null, grade, category: null, brand: S.live.brand, bale_id: S.live.baleId, created_at: new Date().toISOString()};
     p.idPromise = rpc('record_one_piece', {p_grade: grade});
     if ($('#modal').hidden) openBrand(p);
     try {
