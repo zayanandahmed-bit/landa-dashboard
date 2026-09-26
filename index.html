@@ -227,7 +227,7 @@ async function loadAll() {
     q(tb('live_sorting_session').select('*').eq('id', 1).maybeSingle()),
     q(tb('brand_piece_counts').select('*').order('pieces', {ascending: false}).limit(300)),
     q(tb('sensor_devices').select('id,name,last_seen').order('id')),
-    q(tb('sorted_pieces').select('id,bale_id,category,grade,source,created_at').is('brand', null).neq('source', 'bulk').order('id').limit(50)),
+    q(tb('sorted_pieces').select('id,bale_id,category,grade,brand,source,created_at').or('brand.is.null,category.is.null').neq('source', 'bulk').order('id').limit(50)),
   ]);
   if (!set) { showLock('Session expired — log in again'); throw new Error('Locked'); }
   const recent = liveRow?.bale_id
@@ -517,7 +517,6 @@ PAGES.sorting = id => {
   if (!open.length) return head('Sorting', 'Nothing waiting to be sorted') + '<div class="card empty">All bales are sorted. Log a new bale under <a href="#bales">Bales in</a>.</div>';
   const b = open.find(x => x.id === id) || open.find(x => x.id === S.live.baleId) || open[0];
   const isLive = S.live.baleId === b.id;
-  const cat = isLive && S.live.category ? S.live.category : S.categories[0];
   const tot = sum(Object.values(b.yield), q => q);
   return head('Sorting', 'Every piece goes into stock the moment it is counted') + `
   <div class="tabs">${open.map(x => `<a href="#sorting/${x.id}" class="${x.id === b.id ? 'on' : ''}">${S.live.baleId === x.id ? '🟢 ' : ''}${x.id} · ${esc(x.type)} · ${age(x.date)}d</a>`).join('')}</div>
@@ -526,7 +525,7 @@ PAGES.sorting = id => {
       <p class="muted" style="margin:-6px 0 0">${b.weightKg} kg · ${rs(b.cost)} · <b>${num(tot)} pcs so far</b>${tot ? ` · ${(tot / b.weightKg).toFixed(1)} pcs/kg · ${rs(b.cost / tot)}/pc` : ''}</p></div>
       <div class="btns">${isLive ? '<span class="pill p-delivered">● LIVE — sensor boxes count into this bale</span>' : `<button class="btn" data-act="goLive" data-id="${b.id}">▶ Make this the live bale</button>`}
       <button class="btn ghost" data-act="finishBale" data-id="${b.id}">✓ Finish bale</button></div></div>
-    ${isLive ? livePanel(b, cat) : `<p class="muted">Make this the live bale to count with the sensor boxes or the A / B / C buttons.${S.live.baleId ? ` Right now <b>${S.live.baleId}</b> is live.` : ''}</p>`}
+    ${isLive ? livePanel(b) : `<p class="muted">Make this the live bale to count with the sensor boxes or the A / B / C buttons.${S.live.baleId ? ` Right now <b>${S.live.baleId}</b> is live.` : ''}</p>`}
   </div>
   <details class="card" style="margin-top:14px" id="handCount" ${handOpen || !isLive ? 'open' : ''}><summary><b>Count by hand instead</b> <span class="muted">— type the size of each pile</span></summary>
   <form id="sortForm"><div class="tbl"><table class="sortgrid"><tr><th>Category</th>${GRADES.map(g => `<th class="n">${g}</th>`).join('')}<th class="n">Total</th></tr>
@@ -536,24 +535,24 @@ PAGES.sorting = id => {
     <div id="sortSum" class="muted"></div>
     <div class="btns"><label class="muted"><input type="checkbox" name="finish" data-nokeep checked> finish bale after adding</label><button class="btn" type="submit">Add to stock</button></div></div></form></details>`;
 };
-function livePanel(b, cat) {
-  const y = b.yield;
+function livePanel(b) {
+  const y = b.yield, byGrade = g => sum(Object.entries(y).filter(([k]) => k.endsWith('|' + g)), e => e[1]);
   const dev = S.devices.length
     ? S.devices.map(d => { const fresh = d.last_seen && Date.now() - new Date(d.last_seen) < 10 * 60e3; return `<span class="pill ${fresh ? 'p-delivered' : 'p-cancelled'}">📡 ${esc(d.name)} · ${d.last_seen ? 'last count ' + since(d.last_seen) : 'not connected yet'}</span>`; }).join(' ')
     : '<span class="muted">No sensor box connected yet — use the buttons, or keys <b>A B C R</b> (U = undo)</span>';
-  return `<div class="liverow"><label>Category being sorted now<select id="liveCat" data-nokeep>${S.categories.map(c => `<option ${c === cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label><div>${dev}</div></div>
-  <div class="counters">${GRADES.map(g => `<button class="gbtn g-${g}" data-act="piece" data-id="${g}"><span>${g === 'Reject' ? 'Reject' : 'Grade ' + g}</span><b>${num(y[cat + '|' + g] || 0)}</b><small>+1 ${esc(cat)}</small></button>`).join('')}
+  return `<div class="liverow"><div>${dev}</div></div>
+  <div class="counters">${GRADES.map(g => `<button class="gbtn g-${g}" data-act="piece" data-id="${g}"><span>${g === 'Reject' ? 'Reject' : 'Grade ' + g}</span><b>${num(byGrade(g))}</b><small>+1 piece</small></button>`).join('')}
     <button class="gbtn undo" data-act="undo"><span>Undo</span><b>↶</b><small>remove last piece</small></button></div>
-  <h2>Latest pieces ${S.pending.length ? `<span class="pill p-packed">${S.pending.length} waiting for a brand</span>` : ''}</h2>
-  <div class="tbl"><table><tr><th>#</th><th>Time</th><th>Grade</th><th>Category</th><th>Brand</th><th>From</th></tr>
-  ${S.recent.map((p, i) => `<tr class="${i === 0 ? 'flash' : ''}"><td class="muted">${p.id}</td><td>${clock(p.created_at)}</td><td><span class="g g-${p.grade}">${p.grade}</span></td><td>${esc(p.category)}</td>
-    <td>${p.brand ? `<a href="#" data-act="editBrand" data-id="${p.id}">${esc(p.brand)}</a>` : `<button class="btn sm" data-act="editBrand" data-id="${p.id}">Add brand</button>`}</td><td class="muted">${p.source === 'sensor' ? '📡 sensor' : '👆 button'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No pieces yet — throw the first one in!</td></tr>'}
+  <h2>Latest pieces ${S.pending.length ? `<span class="pill p-packed">${S.pending.length} waiting for category / brand</span>` : ''}</h2>
+  <div class="tbl"><table><tr><th>#</th><th>Time</th><th>Grade</th><th>Category</th><th>Brand</th><th>From</th><th></th></tr>
+  ${S.recent.map((p, i) => `<tr class="${i === 0 ? 'flash' : ''}"><td class="muted">${p.id}</td><td>${clock(p.created_at)}</td><td><span class="g g-${p.grade}">${p.grade}</span></td>
+    <td>${p.category ? esc(p.category) : '<span class="low">—</span>'}</td><td>${p.brand ? esc(p.brand) : '<span class="low">—</span>'}</td>
+    <td class="muted">${p.source === 'sensor' ? '📡 sensor' : '👆 button'}</td>
+    <td><button class="btn ${p.category && p.brand ? 'ghost ' : ''}sm" data-act="editBrand" data-id="${p.id}">${p.category && p.brand ? 'Change' : 'Add details'}</button></td></tr>`).join('') || '<tr><td colspan="7" class="empty">No pieces yet — throw the first one in!</td></tr>'}
   </table></div>`;
 }
 AFTER.sorting = id => {
   const d = $('#handCount'); if (d) d.addEventListener('toggle', () => handOpen = d.open);
-  const lc = $('#liveCat');
-  if (lc) lc.addEventListener('change', () => q(tb('live_sorting_session').update({category: lc.value, updated_at: new Date().toISOString()}).eq('id', 1)).then(refresh).catch(e => toast(e.message)));
   const f = $('#sortForm'); if (!f) return;
   const open = S.bales.filter(b => b.status !== 'sorted');
   const b = open.find(x => x.id === id) || open.find(x => x.id === S.live.baleId) || open[0];
@@ -589,24 +588,36 @@ function maybeBrandPopup() {
   if (!m.hidden && (brandShowing === next.id || typeof brandShowing === 'object' || S.pending.some(x => x.id === brandShowing))) { const w = m.querySelector('#waiting'); if (w) w.textContent = S.pending.length > 1 ? `${S.pending.length - 1} more waiting` : ''; return; }
   openBrand(next);
 }
+let lastCat = null;
 function openBrand(p, edit) {
   brandShowing = p.id ?? p;
+  let cat = p.category || lastCat || '';
   const quick = S.brands.filter(b => b.brand !== 'No brand').slice(0, 12);
   const no = `<span id="pieceNo">${p.id ?? '…'}</span>`;
-  const f = modal(edit ? `Change brand — piece #${no}` : `Which brand? — piece #${no}`, `
-    <p class="bigpiece"><span class="g g-${p.grade}">${p.grade}</span> <b>${esc(p.category)}</b> · bale ${p.bale_id} · ${clock(p.created_at)}
+  const f = modal(`Piece #${no} — category & brand`, `
+    <p class="bigpiece"><span class="g g-${p.grade}">${p.grade}</span> bale ${p.bale_id} · ${clock(p.created_at)}
       <span class="pill p-packed" id="waiting">${!edit && S.pending.length > 1 ? `${S.pending.length - 1} more waiting` : ''}</span></p>
+    <label style="margin:12px 0 0">Category</label>
+    <div class="brandbtns" id="catBtns">${S.categories.map(c => `<button type="button" class="btn ${c === cat ? '' : 'ghost'}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    <label style="margin:0">Brand <span style="font-weight:400">— tap one to save</span></label>
     <div class="brandbtns">${quick.map(b => `<button type="button" class="btn ghost" data-brand="${esc(b.brand)}">${esc(b.brand)}</button>`).join('')}
       <button type="button" class="btn ghost" data-brand="No brand" style="border-style:dashed">No brand / skip</button></div>
-    <label>Brand<input name="brand" list="brandlist" placeholder="Type a brand and press Enter" autocomplete="off" value="${esc(p.brand || '')}"></label>
+    <label>Or type a brand<input name="brand" list="brandlist" placeholder="Type a brand and press Enter" autocomplete="off" value="${esc(p.brand || '')}"></label>
     <datalist id="brandlist">${S.brands.map(b => `<option value="${esc(b.brand)}">`).join('')}</datalist>`,
     async f => {
+      if (!cat) return 'Tap a category first';
       const v = f.brand.value.trim();
-      if (!v) return 'Type a brand, or press "No brand / skip"';
+      if (!v) return 'Tap a brand, type one, or press "No brand / skip"';
       const id = p.id ?? await p.idPromise;
-      await q(tb('sorted_pieces').update({brand: v}).eq('id', id));
-    }, 'Save brand', 'brand');
+      await rpc('set_piece_details', {p_piece: id, p_category: cat, p_brand: v});
+      lastCat = cat;
+    }, 'Save', 'brand');
   $('#modal').dataset.edit = edit ? '1' : '';
+  f.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => {
+    cat = b.dataset.cat;
+    f.querySelectorAll('[data-cat]').forEach(x => x.classList.toggle('ghost', x !== b));
+    f.querySelector('.err').textContent = '';
+  });
   f.querySelectorAll('[data-brand]').forEach(b => b.onclick = () => { f.brand.value = b.dataset.brand; f.requestSubmit(); });
   f.querySelector('[data-close]').addEventListener('click', () => {
     if (edit) return;
@@ -834,7 +845,7 @@ const ACT = {
       async f => { await rpc('save_customer', {p_id: id || null, p_name: f.name.value, p_city: f.city.value, p_phone: f.phone.value.replace(/\D/g, ''), p_limit: +f.limit.value || 0}); });
   },
   async goLive(id) {
-    await q(tb('live_sorting_session').update({bale_id: id, category: S.live.category || S.categories[0], updated_at: new Date().toISOString()}).eq('id', 1));
+    await q(tb('live_sorting_session').update({bale_id: id, category: null, updated_at: new Date().toISOString()}).eq('id', 1));
     toast(`${id} is now live — sensor boxes count into it`); refresh();
   },
   async piece(grade) {
@@ -842,7 +853,7 @@ const ACT = {
     beep();
     const n = $(`.gbtn[data-id="${grade}"] b`);
     if (n) n.textContent = num((+n.textContent.replace(/\D/g, '') || 0) + 1);
-    const p = {id: null, grade, category: S.live.category, bale_id: S.live.baleId, created_at: new Date().toISOString()};
+    const p = {id: null, grade, category: null, bale_id: S.live.baleId, created_at: new Date().toISOString()};
     p.idPromise = rpc('record_one_piece', {p_grade: grade});
     if ($('#modal').hidden) openBrand(p);
     try {
@@ -860,7 +871,8 @@ const ACT = {
   },
   async finishBale(id) {
     const b = S.bales.find(x => x.id === id), t = sum(Object.values(b.yield), q => q);
-    if (!confirm(`Finish ${id}? ${num(t)} pcs have been counted. You can't add more pieces to it after this.`)) return;
+    const un = sum(GRADES, g => b.yield['Unassigned|' + g] || 0);
+    if (!confirm(`Finish ${id}? ${num(t)} pcs have been counted.${un ? `\n\n⚠ ${un} pcs still have no category — they won't be in stock until you give them one.` : ''}\n\nYou can't add more pieces to it after this.`)) return;
     await rpc('finish_bale_sorting', {p_bale: id}); toast(`${id} finished`); refresh();
   },
   editBrand(id) {
@@ -1006,10 +1018,10 @@ async function loadDemo() {
   }
   say('Loading demo data… 75%');
   const live = baleIds[4];
-  await q(tb('live_sorting_session').update({bale_id: live, category: 'Jeans', updated_at: new Date().toISOString()}).eq('id', 1));
+  await q(tb('live_sorting_session').update({bale_id: live, category: null, updated_at: new Date().toISOString()}).eq('id', 1));
   const brands = ["Levi's", "Levi's", 'Wrangler', 'Lee', 'Zara', "Levi's", 'H&M', 'Diesel', 'Wrangler', 'No brand', "Levi's", 'Lee', 'Zara', 'Tommy Hilfiger', "Levi's", 'Calvin Klein', 'Wrangler', 'H&M'];
   for (let i = 0; i < brands.length + 2; i++)
-    await rpc('record_one_piece', {p_grade: ['A', 'A', 'B', 'A', 'C', 'B', 'A', 'Reject'][i % 8], p_brand: brands[i] || null});
+    await rpc('record_one_piece', {p_grade: ['A', 'A', 'B', 'A', 'C', 'B', 'A', 'Reject'][i % 8], p_category: i < brands.length ? 'Jeans' : null, p_brand: brands[i] || null});
   say('Demo data loaded ✓');
   location.hash = '#dashboard';
   await refresh();
