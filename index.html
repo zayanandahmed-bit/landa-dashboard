@@ -510,9 +510,9 @@ PAGES.bales = () => head('Bales in', 'Every landa bale you buy — log it the da
   `<div class="card tbl"><table><tr><th>ID</th><th>Date</th><th>Supplier</th><th>Type</th><th class="n">Kg</th><th class="n">Cost</th><th class="n">Rs/kg</th><th>Status</th><th class="n">Pieces</th><th class="n">A-grade</th><th></th></tr>
   ${S.bales.map(b => { const p = sum(Object.values(b.yield), q => q), a = sum(Object.entries(b.yield).filter(([k]) => k.endsWith('|A')), e => e[1]);
     return `<tr><td>${b.id}</td><td>${b.date}</td><td>${esc(b.supplier)}</td><td>${esc(b.type)}</td><td class="n">${num(b.weightKg)}</td><td class="n">${rs(b.cost)}</td><td class="n">${num(b.cost / b.weightKg)}</td>
-    <td>${pill(b.status)}${b.status !== 'sorted' && age(b.date) >= S.settings.sortDays ? ` <span class="low">${age(b.date)}d</span>` : ''}</td>
+    <td>${b.status === 'sorting' && S.live.baleId !== b.id ? '<span class="pill p-received">⏸ Paused</span>' : pill(b.status)}${b.status !== 'sorted' && age(b.date) >= S.settings.sortDays ? ` <span class="low">${age(b.date)}d</span>` : ''}</td>
     <td class="n">${p ? num(p) : '—'}</td><td class="n">${p ? Math.round(a / p * 100) + '%' : '—'}</td>
-    <td>${b.status !== 'sorted' ? `<a class="btn sm" href="#sorting/${b.id}">${b.status === 'sorting' ? 'Continue' : 'Sort now'}</a>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="11" class="empty">No bales yet — add your first one.</td></tr>'}
+    <td>${b.status !== 'sorted' ? `<a class="btn sm" href="#sorting/${b.id}">${b.status === 'sorting' ? (S.live.baleId === b.id ? 'Open' : 'Resume') : 'Sort now'}</a>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="11" class="empty">No bales yet — add your first one.</td></tr>'}
   </table></div>`;
 
 let handOpen = false;
@@ -523,13 +523,13 @@ PAGES.sorting = id => {
   const isLive = S.live.baleId === b.id;
   const tot = sum(Object.values(b.yield), q => q);
   return head('Sorting', 'Every piece goes into stock the moment it is counted') + `
-  <div class="tabs">${open.map(x => `<a href="#sorting/${x.id}" class="${x.id === b.id ? 'on' : ''}">${S.live.baleId === x.id ? '🟢 ' : ''}${x.id} · ${esc(x.type)} · ${age(x.date)}d</a>`).join('')}</div>
+  <div class="tabs">${open.map(x => `<a href="#sorting/${x.id}" class="${x.id === b.id ? 'on' : ''}">${S.live.baleId === x.id ? '🟢 ' : x.status === 'sorting' ? '⏸ ' : ''}${x.id} · ${esc(x.type)} · ${age(x.date)}d</a>`).join('')}</div>
   <div class="card">
     <div class="head"><div><h2>${b.id} — ${esc(b.type)} from ${esc(b.supplier)}</h2>
       <p class="muted" style="margin:-6px 0 0">${b.weightKg} kg · ${rs(b.cost)} · <b>${num(tot)} pcs so far</b>${tot ? ` · ${(tot / b.weightKg).toFixed(1)} pcs/kg · ${rs(b.cost / tot)}/pc` : ''}</p></div>
-      <div class="btns">${isLive ? '<span class="pill p-delivered">● LIVE — sensor boxes count into this bale</span>' : `<button class="btn" data-act="goLive" data-id="${b.id}">▶ Make this the live bale</button>`}
+      <div class="btns">${isLive ? '<span class="pill p-delivered">● LIVE — sensor boxes count into this bale</span><button class="btn ghost" data-act="pauseBale">⏸ Pause bale</button>' : `${tot ? '<span class="pill p-received">⏸ Paused — nothing is being counted</span>' : ''}<button class="btn" data-act="goLive" data-id="${b.id}">${tot ? '▶ Resume this bale' : '▶ Start sorting this bale'}</button>`}
       <button class="btn ghost" data-act="finishBale" data-id="${b.id}">✓ Finish bale</button></div></div>
-    ${isLive ? livePanel(b) : `<p class="muted">Make this the live bale to count with the sensor boxes or the A / B / C buttons.${S.live.baleId ? ` Right now <b>${S.live.baleId}</b> is live.` : ''}</p>`}
+    ${isLive ? livePanel(b) : `<p class="muted">Start or resume this bale to count with the sensor boxes or the A / B / C buttons.${S.live.baleId ? ` Right now <b>${S.live.baleId}</b> is live.` : ''}</p>`}
   </div>
   <details class="card" style="margin-top:14px" id="handCount" ${handOpen || !isLive ? 'open' : ''}><summary><b>Count by hand instead</b> <span class="muted">— type the size of each pile</span></summary>
   <form id="sortForm"><div class="tbl"><table class="sortgrid"><tr><th>Category</th>${GRADES.map(g => `<th class="n">${g}</th>`).join('')}<th class="n">Total</th></tr>
@@ -873,9 +873,14 @@ const ACT = {
     await q(tb('live_sorting_session').update({brand: null, updated_at: new Date().toISOString()}).eq('id', 1));
     S.live.brand = null; toast('Brand mode off'); refresh();
   },
+  async pauseBale() {
+    await q(tb('live_sorting_session').update({bale_id: null, category: null, updated_at: new Date().toISOString()}).eq('id', 1));
+    S.live.baleId = null; S.live.brand = null;
+    toast('⏸ Bale paused — counting is off. Resume it any time.'); refresh();
+  },
   async goLive(id) {
     await q(tb('live_sorting_session').update({bale_id: id, category: null, updated_at: new Date().toISOString()}).eq('id', 1));
-    toast(`${id} is now live — sensor boxes count into it`); refresh();
+    toast(`${id} is live — sensor boxes count into it`); refresh();
   },
   async piece(grade) {
     // Show the count + brand popup instantly; the database save runs behind it.
