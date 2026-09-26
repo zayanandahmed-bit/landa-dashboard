@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Landa Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#1c2230;--mute:#6b7280;--line:#e5e7eb;--brand:#0f766e;--brand2:#14b8a6;
+--warn:#b45309;--warnbg:#fef3c7;--danger:#b91c1c;--dangerbg:#fee2e2;--info:#1d4ed8;--infobg:#dbeafe;--ok:#15803d;--okbg:#dcfce7}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh}
+aside{width:220px;background:#111827;color:#cbd5e1;padding:18px 12px;flex-shrink:0;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+aside .logo{color:#fff;font-weight:700;font-size:17px;padding:4px 10px 18px}
+aside .logo small{display:block;color:#94a3b8;font-weight:400;font-size:12px}
+aside a{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border-radius:8px;color:inherit;text-decoration:none;margin-bottom:2px;white-space:nowrap}
+aside a:hover{background:#1f2937}
+aside a.on{background:var(--brand);color:#fff}
+aside .foot{margin-top:auto;padding:10px;font-size:12px;color:#94a3b8;display:flex;justify-content:space-between;align-items:center;gap:8px}
+aside .foot a{display:inline;padding:0;color:#cbd5e1;text-decoration:underline;margin:0}
+.sync i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:6px}
+.sync i.on{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.25)}
+.badge{background:var(--danger);color:#fff;border-radius:99px;font-size:11px;padding:1px 7px;margin-left:8px}
+main{flex:1;padding:24px 28px 60px;min-width:0}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:15px;margin:0 0 12px}
+.sub{color:var(--mute);margin:0 0 20px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.grid{display:grid;gap:14px;margin-bottom:14px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.two{grid-template-columns:1.2fr 1fr}
+.half{grid-template-columns:1fr 1fr}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.kpi .l{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.kpi .v{font-size:24px;font-weight:700;margin-top:4px}
+.kpi .v.sm{font-size:18px}
+.kpi .h{font-size:12px;color:var(--mute)}
+.kpi.gold{background:linear-gradient(135deg,#fffbeb,#fff);border-color:#fcd34d}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;color:var(--mute);font-weight:600;background:#fafafa}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--brand);background:var(--brand);color:#fff;border-radius:8px;padding:7px 12px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none}
+.btn:hover{filter:brightness(1.1)}
+.btn:disabled{opacity:.5;cursor:wait}
+.btn.ghost{background:#fff;color:var(--brand)}
+.btn.sm{padding:3px 9px;font-size:12px;font-weight:600}
+.btn.red{background:#fff;color:var(--danger);border-color:#fca5a5}
+.btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-block;border-radius:99px;padding:1px 9px;font-size:12px;font-weight:600}
+.p-new{background:var(--infobg);color:var(--info)}.p-packed{background:var(--warnbg);color:var(--warn)}
+.p-dispatched{background:#ede9fe;color:#6d28d9}.p-delivered{background:var(--okbg);color:var(--ok)}
+.p-cancelled{background:#f3f4f6;color:#6b7280}.p-received{background:var(--warnbg);color:var(--warn)}.p-sorted{background:var(--okbg);color:var(--ok)}
+.p-sorting{background:#ede9fe;color:#6d28d9}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;margin-bottom:8px;text-decoration:none;color:var(--ink)}
+.alert b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.a-danger{background:var(--dangerbg)}.a-danger b{color:var(--danger)}
+.a-warn{background:var(--warnbg)}.a-warn b{color:var(--warn)}
+.a-info{background:var(--infobg)}.a-info b{color:var(--info)}
+.a-gold{background:#fef9c3}.a-gold b{color:#854d0e}
+.dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.a-danger .dot{background:var(--danger)}.a-warn .dot{background:var(--warn)}.a-info .dot{background:var(--info)}.a-gold .dot{background:#ca8a04}
+.pipe{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.pipe a{flex:1;min-width:120px;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-decoration:none;color:var(--ink)}
+.pipe a .v{font-size:20px;font-weight:700}.pipe a .l{font-size:12px;color:var(--mute)}
+.bars{display:flex;align-items:flex-end;gap:4px;height:140px;padding-top:8px}
+.bars div{flex:1;background:var(--brand2);border-radius:4px 4px 0 0;min-height:2px;position:relative}
+.bars div:hover{background:var(--brand)}
+.axis{display:flex;justify-content:space-between;font-size:11px;color:var(--mute);margin-top:4px}
+.meter{height:6px;background:#eef2f7;border-radius:3px;width:90px;display:inline-block;vertical-align:middle;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--ok)}
+.low{color:var(--danger);font-weight:700}
+.up{color:var(--ok);font-weight:600}.down{color:var(--danger);font-weight:600}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs a{padding:5px 12px;border-radius:99px;background:#fff;border:1px solid var(--line);text-decoration:none;color:var(--ink);font-size:13px}
+.tabs a.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.sortgrid input{width:80px;padding:6px;border:1px solid var(--line);border-radius:6px;font:inherit;text-align:right}
+.muted{color:var(--mute)}
+.empty{padding:30px;text-align:center;color:var(--mute)}
+details summary{cursor:pointer}
+details[open] summary{margin-bottom:12px}
+.liverow{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin:6px 0 14px}
+.liverow label{font-size:12px;font-weight:600;color:var(--mute)}
+.liverow select{display:block;margin-top:4px;padding:9px 12px;border:2px solid var(--brand);border-radius:8px;font:inherit;font-size:16px;font-weight:700;min-width:200px}
+.counters{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px}
+.gbtn{border:0;border-radius:14px;padding:14px 10px;cursor:pointer;color:#fff;display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;transition:transform .08s}
+.gbtn:active{transform:scale(.96)}
+.gbtn span{font-size:13px;font-weight:600;opacity:.9}
+.gbtn b{font-size:36px;line-height:1.1}
+.gbtn small{font-size:11px;opacity:.85}
+.g-A{background:#15803d}.g-B{background:#1d4ed8}.g-C{background:#b45309}.g-Reject{background:#6b7280}.undo{background:#111827}
+.g{display:inline-block;min-width:26px;text-align:center;border-radius:6px;color:#fff;font-weight:700;padding:1px 6px;font-size:12px}
+.flash{animation:flash .6s}
+@keyframes flash{from{background:#fef08a}to{background:transparent}}
+.brandbtns{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px}
+.bigpiece{font-size:15px;margin:0}
+#lock{position:fixed;inset:0;background:#111827;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+#lock[hidden]{display:none}
+#lock form{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:360px;text-align:center}
+#lock .ic{font-size:34px}
+#lock input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;margin:14px 0 10px;text-align:center}
+#lock .btn{width:100%;justify-content:center;padding:10px}
+#lock .err{color:var(--danger);font-weight:600;min-height:20px;margin-top:10px}
+#modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:10;overflow:auto}
+#modal[hidden]{display:none}
+#modal form{background:#fff;border-radius:14px;padding:20px;width:100%;max-width:560px}
+#modal label{display:block;font-size:12px;font-weight:600;color:var(--mute);margin-bottom:10px}
+#modal input,#modal select{display:block;width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;color:var(--ink)}
+#modal .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#modal .line{display:grid;grid-template-columns:1fr 80px 90px 30px;gap:6px;margin-bottom:6px}
+#modal .line input,#modal .line select{margin:0}
+#modal .x{border:0;background:#fee2e2;color:var(--danger);border-radius:6px;cursor:pointer}
+#modal .foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:10px}
+#modal .err{color:var(--danger);font-weight:600}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none;z-index:60;max-width:90vw}
+#toast.show{opacity:1}
+.set{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.set label{font-size:12px;font-weight:600;color:var(--mute)}
+.set input{display:block;width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit}
+code{background:#f3f4f6;padding:2px 6px;border-radius:5px;font-size:13px;word-break:break-all}
+@media(max-width:860px){
+  body{flex-direction:column}
+  aside{width:auto;height:auto;position:static;flex-direction:row;overflow-x:auto;padding:10px;gap:4px}
+  aside .logo{display:none}
+  aside .foot{margin:0}
+  .two,.half{grid-template-columns:1fr}
+  .counters{grid-template-columns:repeat(3,1fr)}
+  main{padding:16px}
+}
+@media print{aside,.btn{display:none}}
+</style>
+</head>
+<body>
+<aside id="nav"></aside>
+<main id="app"></main>
+<div id="modal" hidden></div>
+<div id="lock" hidden>
+  <form id="lockForm">
+    <div class="ic">🔒</div>
+    <h1>Landa Dashboard</h1>
+    <p class="muted">Enter the password to continue</p>
+    <input type="password" name="pw" autocomplete="current-password" placeholder="Password" required>
+    <button class="btn">Unlock</button>
+    <div class="err" id="lockErr"></div>
+  </form>
+</div>
+<div id="toast"></div>
+<script>
+/* ---------- connection ---------- */
+const SUPA_URL = 'https://ajevxwdgmpaakjkffvmf.supabase.co';
+// Public "anon" key — safe to ship. Every table is locked behind the
+// dashboard password by row level security (see supabase/setup.sql).
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqZXZ4d2RnbXBhYWtqa2Zmdm1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNjE5NzIsImV4cCI6MjEwMDYzNzk3Mn0.bB97bHOFgCeMUTYUraOArzvXAkFRHxiajrCg3gwCGrc';
+const T = name => 'landa_clothing_wholesale_business_' + name;
+const TOKEN_KEY = 'landa-dashboard-session';
+
+/* ---------- basics ---------- */
+const GRADES = ['A', 'B', 'C', 'Reject'];
+const FLOW = ['new', 'packed', 'dispatched', 'delivered'];
+const LABEL = {new:'New', packed:'Packed', dispatched:'Dispatched', delivered:'Delivered', cancelled:'Cancelled', received:'Waiting to sort', sorting:'Sorting now', sorted:'Sorted'};
+const COURIERS = ['TCS', 'Leopards', 'M&P', 'Daewoo Cargo', 'Own vehicle', 'Other'];
+
+const $ = s => document.querySelector(s);
+const iso = d => d.toLocaleDateString('en-CA');
+const today = () => iso(new Date());
+const ago = n => iso(new Date(Date.now() - n * 864e5));
+const age = d => Math.round((new Date(today()) - new Date(d)) / 864e5);
+const rs = n => 'Rs ' + Math.round(n || 0).toLocaleString('en-PK');
+const num = n => Math.round(n || 0).toLocaleString('en-PK');
+const sum = (arr, f) => arr.reduce((s, x) => s + (f(x) || 0), 0);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const label = k => k.replace('|', ' · ');
+const pill = s => `<span class="pill p-${s}">${LABEL[s]}</span>`;
+const clock = ts => new Date(ts).toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+const since = ts => { const s = (Date.now() - new Date(ts)) / 1000; return s < 60 ? Math.max(0, Math.round(s)) + 's ago' : s < 3600 ? Math.round(s / 60) + 'm ago' : s < 86400 ? Math.round(s / 3600) + 'h ago' : iso(new Date(ts)); };
+const route = () => (location.hash.slice(1) || 'dashboard').split('/');
+function toast(msg, ms = 2400) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), ms); }
+let actx;
+function beep() { try { actx = actx || new AudioContext(); const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 880; g.gain.value = .08; o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + .09); } catch (e) {} }
+
+let S = null;
+const ZERO = {qty: 0, price: 0, min: 0};
+const ST = k => S.stock[k] || ZERO;
+const cust = id => S.customers.find(c => c.id === id) || {name: '(deleted)', city: '', phone: ''};
+const total = o => sum(o.lines, l => l.qty * l.price);
+const due = o => o.status === 'cancelled' ? 0 : total(o) - (o.paid || 0);
+const custDue = id => sum(S.orders.filter(o => o.customerId === id), due);
+const live = o => o.status !== 'cancelled';
+
+/* ---------- database ---------- */
+let sb, token = sessionStorage.getItem(TOKEN_KEY), channel = null, liveOK = false;
+function makeClient() {
+  sb = supabase.createClient(SUPA_URL, SUPA_KEY, {
+    auth: {persistSession: false, autoRefreshToken: false, detectSessionInUrl: false},
+    global: {headers: token ? {'x-landa-session': token} : {}},
+  });
+}
+async function rpc(name, args = {}) {
+  const {data, error} = await sb.rpc(T(name), args);
+  if (error) { if (/Locked/.test(error.message)) showLock('Session expired — log in again'); throw new Error(error.message); }
+  return data;
+}
+async function q(query) { const {data, error} = await query; if (error) throw new Error(error.message); return data; }
+async function all(build) {
+  let out = [];
+  for (let from = 0; ; from += 1000) {
+    const d = await q(build().range(from, from + 999));
+    out = out.concat(d);
+    if (d.length < 1000) return out;
+  }
+}
+const tb = n => sb.from(T(n));
+
+async function loadAll() {
+  const [set, cats, stock, bales, yields, custs, orders, lines, log, liveRow, brands, devices, pending] = await Promise.all([
+    q(tb('settings').select('*').eq('id', 1).maybeSingle()),
+    q(tb('categories').select('name').order('sort_order').order('name')),
+    all(() => tb('stock_items').select('*').order('category')),
+    all(() => tb('bales_received').select('*').order('created_at', {ascending: false})),
+    all(() => tb('bale_yield_totals').select('*').order('bale_id')),
+    all(() => tb('wholesale_customers').select('*').order('name')),
+    all(() => tb('customer_orders').select('*').order('created_at', {ascending: false})),
+    all(() => tb('customer_order_lines').select('order_id,category,grade,qty,price').order('id')),
+    q(tb('activity_log').select('happened_on,message').order('id', {ascending: false}).limit(200)),
+    q(tb('live_sorting_session').select('*').eq('id', 1).maybeSingle()),
+    q(tb('brand_piece_counts').select('*').order('pieces', {ascending: false}).limit(300)),
+    q(tb('sensor_devices').select('id,name,last_seen').order('id')),
+    q(tb('sorted_pieces').select('id,bale_id,category,grade,source,created_at').is('brand', null).neq('source', 'bulk').order('id').limit(50)),
+  ]);
+  if (!set) { showLock('Session expired — log in again'); throw new Error('Locked'); }
+  const recent = liveRow?.bale_id
+    ? await q(tb('sorted_pieces').select('id,bale_id,category,grade,brand,source,created_at').eq('bale_id', liveRow.bale_id).neq('source', 'bulk').order('id', {ascending: false}).limit(15))
+    : [];
+  const byBale = {}, byOrder = {};
+  S = {
+    settings: {bizName: set.biz_name, alertEmail: set.alert_email, sortDays: set.sort_days, dispatchDays: set.dispatch_days,
+      dueDays: set.due_days, runoutDays: set.runout_days, deadDays: set.dead_days, lockoutSeconds: set.sensor_lockout_seconds},
+    categories: cats.map(c => c.name),
+    stock: Object.fromEntries(stock.map(s => [s.category + '|' + s.grade, {qty: s.qty, price: +s.price, min: s.min_qty}])),
+    bales: bales.map(b => byBale[b.id] = {id: b.id, date: b.received_date, supplier: b.supplier, type: b.bale_type,
+      weightKg: +b.weight_kg, cost: +b.cost, status: b.status, sortedDate: b.sorted_date, yield: {}}),
+    customers: custs.map(c => ({id: c.id, name: c.name, city: c.city, phone: c.phone, limit: +c.credit_limit})),
+    orders: orders.map(o => byOrder[o.id] = {id: o.id, date: o.order_date, customerId: o.customer_id, status: o.status, paid: +o.paid,
+      courier: o.courier, tracking: o.tracking, history: o.history || [], lines: []}),
+    log: log.map(l => ({d: l.happened_on, t: l.message})),
+    live: {baleId: liveRow?.bale_id || null, category: liveRow?.category || null},
+    brands, devices, pending, recent,
+  };
+  yields.forEach(y => { if (byBale[y.bale_id]) byBale[y.bale_id].yield[y.category + '|' + y.grade] = y.qty; });
+  lines.forEach(l => { if (byOrder[l.order_id]) byOrder[l.order_id].lines.push({key: l.category + '|' + l.grade, qty: l.qty, price: +l.price}); });
+}
+
+let refreshing = null, again = false, lastPieceId = null;
+function refresh() {
+  if (refreshing) { again = true; return refreshing; }
+  refreshing = (async () => {
+    try {
+      do { again = false; await loadAll(); } while (again);
+      const top = S.recent[0]?.id || 0;
+      if (lastPieceId !== null && top > lastPieceId && route()[0] === 'sorting') beep();
+      lastPieceId = top;
+      render(true);
+    } catch (e) { if (e.message !== 'Locked') toast(e.message); }
+    finally { refreshing = null; }
+  })();
+  return refreshing;
+}
+function subscribe() {
+  if (channel) sb.removeChannel(channel);
+  let t;
+  channel = sb.channel('landa-sync-' + Math.random().toString(36).slice(2))
+    .on('postgres_changes', {event: '*', schema: 'public', table: T('sync_pings')}, () => { clearTimeout(t); t = setTimeout(refresh, 120); })
+    .subscribe(status => { const was = liveOK; liveOK = status === 'SUBSCRIBED'; drawNav(); if (liveOK && !was) refresh(); });
+}
+
+/* ---------- login ---------- */
+function showLock(msg) {
+  $('#lock').hidden = false;
+  $('#lockErr').textContent = msg || '';
+  setTimeout(() => $('#lock input').focus(), 50);
+}
+$('#lockForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.target, btn = f.querySelector('.btn');
+  btn.disabled = true; $('#lockErr').textContent = '';
+  token = null; makeClient();
+  const {data, error} = await sb.rpc(T('unlock_dashboard'), {p_password: f.pw.value, p_device: navigator.userAgent});
+  btn.disabled = false;
+  if (error) { $('#lockErr').textContent = /schema cache|does not exist/.test(error.message) ? 'Database is not set up yet' : error.message; f.pw.select(); return; }
+  token = data; sessionStorage.setItem(TOKEN_KEY, token); f.reset();
+  start();
+});
+async function start() {
+  makeClient();
+  if (!token) return showLock();
+  const {data, error} = await sb.rpc(T('session_is_valid'));
+  if (error) return showLock(/schema cache|does not exist/.test(error.message) ? 'Database is not set up yet — run supabase/setup.sql' : 'Cannot reach the database: ' + error.message);
+  if (!data) { sessionStorage.removeItem(TOKEN_KEY); token = null; makeClient(); return showLock(); }
+  $('#lock').hidden = true;
+  try { await loadAll(); } catch (e) { return; }
+  lastPieceId = S.recent[0]?.id || 0;
+  render();
+  subscribe();
+}
+
+/* ---------- analytics ---------- */
+function velocity(days = 14) {
+  const v = {};
+  S.orders.filter(o => live(o) && age(o.date) < days).forEach(o => o.lines.forEach(l => v[l.key] = (v[l.key] || 0) + l.qty));
+  return v;
+}
+function salesAgg(fromAge, toAge) {
+  const m = {};
+  S.orders.filter(o => live(o) && age(o.date) >= fromAge && age(o.date) < toAge).forEach(o => o.lines.forEach(l => {
+    const r = m[l.key] || (m[l.key] = {key: l.key, pcs: 0, rev: 0, orders: 0, custs: new Set()});
+    r.pcs += l.qty; r.rev += l.qty * l.price; r.orders++; r.custs.add(o.customerId);
+  }));
+  return m;
+}
+function bestSeller(days = 30) { return Object.values(salesAgg(0, days)).sort((a, b) => b.pcs - a.pcs)[0]; }
+function supplierForCategory(cat) {
+  const m = {};
+  S.bales.filter(b => b.status !== 'received').forEach(b => GRADES.forEach(g => {
+    const q = b.yield[cat + '|' + g]; if (!q) return;
+    const s = m[b.supplier] || (m[b.supplier] = {name: b.supplier, pcs: 0, a: 0});
+    s.pcs += q; if (g === 'A') s.a += q;
+  }));
+  return Object.values(m).filter(s => s.pcs >= 20).sort((x, y) => y.a / y.pcs - x.a / x.pcs)[0];
+}
+function alerts() {
+  const A = [], st = S.settings, v = velocity(), push = (lvl, type, text, go) => A.push({lvl, type, text, go});
+  Object.entries(S.stock).forEach(([k, s]) => {
+    if (s.min > 0 && s.qty <= s.min) push(s.qty <= 0 ? 'danger' : 'warn', 'Low stock', `${label(k)} is down to ${num(s.qty)} pcs (minimum ${s.min})`, '#inventory');
+    else if (v[k] && s.qty > 0) {
+      const cover = s.qty / (v[k] / 14);
+      if (cover <= st.runoutDays) push('info', 'Selling fast', `${label(k)} will run out in ~${Math.max(1, Math.round(cover))} days at current pace (${v[k]} sold in 14 days)`, '#inventory');
+    }
+  });
+  S.bales.filter(b => b.status !== 'sorted' && age(b.date) >= st.sortDays)
+    .forEach(b => push('warn', 'Sorting delay', `Bale ${b.id} (${b.type}, ${b.weightKg} kg) arrived ${age(b.date)} days ago and is still ${b.status === 'sorting' ? 'being sorted' : 'not sorted'} — ${rs(b.cost)} of cash sitting idle`, '#sorting/' + b.id));
+  S.orders.filter(o => (o.status === 'new' || o.status === 'packed') && age(o.date) >= st.dispatchDays)
+    .forEach(o => push('warn', 'Dispatch late', `${o.id} for ${cust(o.customerId).name} is ${LABEL[o.status].toLowerCase()} but not sent — ${age(o.date)} days old`, '#orders'));
+  S.orders.filter(o => due(o) > 0 && age(o.date) >= st.dueDays)
+    .forEach(o => push('danger', 'Payment overdue', `${cust(o.customerId).name} owes ${rs(due(o))} on ${o.id} (${age(o.date)} days)`, '#orders'));
+  S.customers.forEach(c => { const d = custDue(c.id); if (c.limit && d > c.limit) push('danger', 'Credit limit', `${c.name} owes ${rs(d)} — over their ${rs(c.limit)} limit. Hold new orders until paid.`, '#customers'); });
+  const moving = velocity(st.deadDays);
+  const dead = Object.entries(S.stock).filter(([k, s]) => s.qty >= 150 && !moving[k]);
+  if (dead.length) push('info', 'Not moving', `${dead.length} items have 150+ pcs and no sales in ${st.deadDays} days: ${dead.slice(0, 5).map(([k, s]) => `${label(k)} (${num(s.qty)})`).join(', ')}${dead.length > 5 ? '…' : ''}. Consider a bundle deal.`, '#inventory');
+  const rank = {danger: 0, warn: 1, info: 2};
+  return A.sort((a, b) => rank[a.lvl] - rank[b.lvl]);
+}
+function supplierStats() {
+  const m = {};
+  S.bales.forEach(b => {
+    const s = m[b.supplier] || (m[b.supplier] = {name: b.supplier, bales: 0, sorted: 0, kg: 0, cost: 0, pcs: 0, a: 0, rej: 0});
+    s.bales++;
+    if (b.status !== 'sorted') return;
+    s.sorted++; s.kg += b.weightKg; s.cost += b.cost;
+    Object.entries(b.yield).forEach(([k, q]) => { s.pcs += q; const g = k.split('|')[1]; if (g === 'A') s.a += q; if (g === 'Reject') s.rej += q; });
+  });
+  return Object.values(m).sort((x, y) => (y.pcs ? y.a / y.pcs : 0) - (x.pcs ? x.a / x.pcs : 0));
+}
+
+/* ---------- nav ---------- */
+const NAV = [['dashboard', 'Dashboard'], ['insights', 'Best sellers'], ['bales', 'Bales in'], ['sorting', 'Sorting'], ['inventory', 'Inventory'], ['orders', 'Orders'], ['customers', 'Wholesalers'], ['alerts', 'Alerts'], ['settings', 'Settings']];
+function drawNav() {
+  if (!S) return;
+  const pg = route()[0];
+  const n = alerts().filter(a => a.lvl !== 'info').length;
+  $('#nav').innerHTML = `<div class="logo">${esc(S.settings.bizName)}<small>Landa → Sort → Sell</small></div>` +
+    NAV.map(([id, t]) => `<a href="#${id}" class="${pg === id ? 'on' : ''}">${t}${id === 'alerts' && n ? `<span class="badge">${n}</span>` : ''}${id === 'sorting' && S.live.baleId ? '<span class="badge" style="background:#22c55e">LIVE</span>' : ''}</a>`).join('') +
+    `<div class="foot"><span class="sync"><i class="${liveOK ? 'on' : ''}"></i>${liveOK ? 'Live sync' : 'Connecting…'}</span><a href="#" data-act="logout">Log out</a></div>`;
+}
+
+/* ---------- pages ---------- */
+const PAGES = {};
+const AFTER = {};
+const head = (t, sub, btns = '') => `<div class="head"><div><h1>${t}</h1><p class="sub">${sub}</p></div><div class="btns">${btns}</div></div>`;
+const alertHtml = a => `<a class="alert a-${a.lvl}" href="${a.go}"><span class="dot"></span><span><b>${a.type}</b>${esc(a.text)}</span></a>`;
+
+PAGES.dashboard = () => {
+  const st = Object.values(S.stock), A = alerts();
+  const waiting = S.bales.filter(b => b.status !== 'sorted');
+  const month = today().slice(0, 7);
+  const mSales = sum(S.orders.filter(o => live(o) && o.date.startsWith(month)), total);
+  const mBuy = sum(S.bales.filter(b => b.date.startsWith(month)), b => b.cost);
+  const cnt = s => S.orders.filter(o => o.status === s).length;
+  const days = [...Array(14)].map((_, i) => ago(13 - i));
+  const daily = days.map(d => sum(S.orders.filter(o => live(o) && o.date === d), total));
+  const max = Math.max(...daily, 1);
+  const v = velocity();
+  const movers = Object.entries(v).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const bs = bestSeller(30);
+  if (!S.bales.length && !S.orders.length) return head('Dashboard', 'Nothing here yet') +
+    `<div class="card empty"><h2>Welcome 👋</h2><p>Start by logging your first bale under <a href="#bales">Bales in</a>, or load demo data from <a href="#settings">Settings</a> to see how everything works.</p></div>`;
+  return head('Dashboard', `${new Date().toDateString()} — everything from bale to delivery in one place`) + `
+  <div class="grid kpis">
+    <a class="card kpi gold" href="#insights" style="text-decoration:none;color:inherit"><div class="l">🏆 Best seller · 30 days</div><div class="v sm">${bs ? esc(label(bs.key)) : '—'}</div><div class="h">${bs ? `${num(bs.pcs)} pcs · ${rs(bs.rev)}` : 'no sales yet'}</div></a>
+    <div class="card kpi"><div class="l">Stock on hand</div><div class="v">${num(sum(st, s => s.qty))} pcs</div><div class="h">worth ${rs(sum(st, s => s.qty * s.price))} at selling price</div></div>
+    <div class="card kpi"><div class="l">Sales this month</div><div class="v">${rs(mSales)}</div><div class="h">bales bought this month: ${rs(mBuy)}</div></div>
+    <div class="card kpi"><div class="l">Money to collect</div><div class="v">${rs(sum(S.orders, due))}</div><div class="h">from ${S.customers.filter(c => custDue(c.id) > 0).length} wholesalers</div></div>
+    <div class="card kpi"><div class="l">Needs attention</div><div class="v" style="color:${A.some(a => a.lvl === 'danger') ? 'var(--danger)' : 'inherit'}">${A.filter(a => a.lvl !== 'info').length}</div><div class="h">alerts + ${A.filter(a => a.lvl === 'info').length} signals</div></div>
+  </div>
+  <div class="card" style="margin-bottom:14px"><h2>Pipeline</h2><div class="pipe">
+    <a href="#sorting"><div class="v">${waiting.length}</div><div class="l">Bales to sort (${num(sum(waiting, b => b.weightKg))} kg)</div></a>
+    <a href="#inventory"><div class="v">${num(sum(st, s => s.qty))}</div><div class="l">Pieces in stock</div></a>
+    <a href="#orders/new"><div class="v">${cnt('new')}</div><div class="l">New orders</div></a>
+    <a href="#orders/packed"><div class="v">${cnt('packed')}</div><div class="l">Packed, ready</div></a>
+    <a href="#orders/dispatched"><div class="v">${cnt('dispatched')}</div><div class="l">On the road</div></a>
+    <a href="#orders/delivered"><div class="v">${cnt('delivered')}</div><div class="l">Delivered</div></a>
+  </div></div>
+  <div class="grid two">
+    <div class="card"><h2>Alerts & signals</h2>${A.slice(0, 6).map(alertHtml).join('') || '<div class="empty">All clear 👌</div>'}
+      ${A.length > 6 ? `<a href="#alerts" class="btn ghost sm">See all ${A.length}</a>` : ''}</div>
+    <div class="card"><h2>Sales — last 14 days</h2>
+      <div class="bars">${daily.map((x, i) => `<div style="height:${x / max * 100}%" title="${days[i]}: ${rs(x)}"></div>`).join('')}</div>
+      <div class="axis"><span>${days[0].slice(5)}</span><span>today</span></div>
+      <h2 style="margin-top:18px">Fastest movers (14 days)</h2>
+      <div class="tbl"><table><tr><th>Item</th><th class="n">Sold</th><th class="n">Left</th><th class="n">Days left</th></tr>
+      ${movers.map(([k, q]) => { const left = ST(k).qty, cover = left / (q / 14); return `<tr><td>${esc(label(k))}</td><td class="n">${num(q)}</td><td class="n">${num(left)}</td><td class="n ${cover <= S.settings.runoutDays ? 'low' : ''}">${left <= 0 ? 'OUT' : Math.round(cover)}</td></tr>`; }).join('') || '<tr><td colspan="4" class="muted">No sales in the last 14 days</td></tr>'}
+      </table></div></div>
+  </div>
+  <div class="card"><h2>Supplier quality — which landa is worth buying?</h2>${supplierTable()}</div>`;
+};
+function supplierTable() {
+  const rows = supplierStats();
+  if (!rows.length) return '<p class="muted">Log and sort some bales to compare suppliers.</p>';
+  return `<div class="tbl"><table><tr><th>Supplier</th><th class="n">Bales</th><th class="n">Rs / kg</th><th class="n">Pcs / kg</th><th class="n">Cost / pc</th><th>A-grade share</th><th class="n">Reject</th></tr>
+  ${rows.map(s => `<tr><td>${esc(s.name)}</td><td class="n">${s.bales}${s.bales > s.sorted ? ` <span class="muted">(${s.bales - s.sorted} unsorted)</span>` : ''}</td>
+    <td class="n">${s.kg ? num(s.cost / s.kg) : '—'}</td><td class="n">${s.kg ? (s.pcs / s.kg).toFixed(1) : '—'}</td><td class="n">${s.pcs ? rs(s.cost / s.pcs) : '—'}</td>
+    <td>${s.pcs ? `<span class="meter"><i style="width:${s.a / s.pcs * 100}%"></i></span> ${Math.round(s.a / s.pcs * 100)}%` : '—'}</td>
+    <td class="n">${s.pcs ? Math.round(s.rej / s.pcs * 100) + '%' : '—'}</td></tr>`).join('')}</table></div>`;
+}
+
+PAGES.insights = arg => {
+  const PERIODS = [[7, '7 days'], [30, '30 days'], [90, '90 days'], [365, '1 year'], [0, 'All time']];
+  const days = PERIODS.some(p => p[0] === +arg) && arg !== undefined ? +arg : 30;
+  const plabel = PERIODS.find(p => p[0] === days)[1];
+  const span = days || Math.max(1, ...S.orders.map(o => age(o.date) + 1));
+  const cur = salesAgg(0, days || Infinity), prev = days ? salesAgg(days, days * 2) : {};
+  const items = Object.values(cur).sort((a, b) => b.pcs - a.pcs);
+  const tabs = `<div class="tabs">${PERIODS.map(([d, t]) => `<a href="#insights/${d}" class="${d === days ? 'on' : ''}">${t}</a>`).join('')}</div>`;
+  const top = head('Best sellers', 'What sells, what earns, who buys — worked out from every order');
+  if (!items.length) return top + tabs + `<div class="card empty">No sales in the last ${plabel.toLowerCase()} yet.</div>`;
+  const totPcs = sum(items, r => r.pcs), totRev = sum(items, r => r.rev);
+  const best = items[0], earner = [...items].sort((a, b) => b.rev - a.rev)[0];
+  const group = (keyFn) => { const m = {}; items.forEach(r => { const k = keyFn(r); const x = m[k] || (m[k] = {name: k, pcs: 0, rev: 0}); x.pcs += r.pcs; x.rev += r.rev; }); return Object.values(m).sort((a, b) => b.rev - a.rev); };
+  const cats = group(r => r.key.split('|')[0]), grades = group(r => r.key.split('|')[1]);
+  const custs = {}; S.orders.filter(o => live(o) && age(o.date) < (days || Infinity)).forEach(o => { const c = custs[o.customerId] || (custs[o.customerId] = {id: o.customerId, rev: 0, pcs: 0, orders: 0}); c.rev += total(o); c.pcs += sum(o.lines, l => l.qty); c.orders++; });
+  const custList = Object.values(custs).sort((a, b) => b.rev - a.rev);
+  const trend = r => { if (!days) return ''; const p = prev[r.key]?.pcs || 0; if (!p) return '<span class="up">new</span>'; const d = (r.pcs - p) / p * 100; return `<span class="${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '↑' : '↓'} ${Math.abs(Math.round(d))}%</span>`; };
+  const cover = r => { const left = ST(r.key).qty, rate = r.pcs / span; return left <= 0 ? 0 : rate ? left / rate : Infinity; };
+
+  const sig = [];
+  sig.push({lvl: 'gold', type: 'Best seller', text: `${label(best.key)} is your #1 — ${num(best.pcs)} pcs (${Math.round(best.pcs / totPcs * 100)}% of everything sold) for ${rs(best.rev)} in ${plabel.toLowerCase()}.`, go: '#inventory'});
+  const bc = cover(best);
+  if (bc < S.settings.runoutDays * 2) sig.push({lvl: 'warn', type: 'Restock', text: `${label(best.key)} has ${bc === 0 ? 'run out' : `only ~${Math.round(bc)} days of stock left`} at this pace. Sort more ${best.key.split('|')[0]} bales first — and since it sells anyway, there's room to raise its price a little.`, go: '#sorting'});
+  const topCat = cats[0], sup = supplierForCategory(topCat.name);
+  sig.push({lvl: 'info', type: 'Top category', text: `${topCat.name} brings in the most money: ${rs(topCat.rev)} (${Math.round(topCat.rev / totRev * 100)}% of sales).${sup ? ` ${sup.name} gives you the most A-grade ${topCat.name} (${Math.round(sup.a / sup.pcs * 100)}% A) — buy ${topCat.name} bales from them.` : ''}`, go: '#bales'});
+  if (days) {
+    const risers = items.filter(r => (prev[r.key]?.pcs || 0) >= 20).map(r => ({r, d: (r.pcs - prev[r.key].pcs) / prev[r.key].pcs})).sort((a, b) => b.d - a.d);
+    if (risers[0] && risers[0].d > .2) sig.push({lvl: 'info', type: 'Rising fast', text: `${label(risers[0].r.key)} sales are up ${Math.round(risers[0].d * 100)}% compared with the ${plabel.toLowerCase()} before.`, go: '#inventory'});
+    const fallers = risers.filter(x => x.d < -.3).reverse();
+    if (fallers[0]) sig.push({lvl: 'warn', type: 'Slowing down', text: `${label(fallers[0].r.key)} sales dropped ${Math.round(-fallers[0].d * 100)}% compared with the ${plabel.toLowerCase()} before.`, go: '#inventory'});
+  }
+  const aRev = grades.find(g => g.name === 'A');
+  if (aRev) sig.push({lvl: 'info', type: 'Grade mix', text: `A-grade is ${Math.round(aRev.rev / totRev * 100)}% of your money. Every extra A-grade piece you find when sorting is worth the most.`, go: '#sorting'});
+  const topBrand = S.brands.find(b => b.brand !== 'No brand');
+  if (topBrand) sig.push({lvl: 'info', type: 'Top brand', text: `${topBrand.brand} is the brand you sort most (${num(topBrand.pieces)} pcs, ${Math.round(topBrand.a_pieces / topBrand.pieces * 100)}% A-grade). Branded A-grade pieces are the ones to sell as premium.`, go: '#sorting'});
+
+  return top + tabs + `
+  <div class="grid kpis">
+    <div class="card kpi gold"><div class="l">🏆 Best seller (pieces)</div><div class="v sm">${esc(label(best.key))}</div><div class="h">${num(best.pcs)} pcs · ${trend(best) || rs(best.rev)}</div></div>
+    <div class="card kpi"><div class="l">💰 Top earner</div><div class="v sm">${esc(label(earner.key))}</div><div class="h">${rs(earner.rev)} · ${num(earner.pcs)} pcs</div></div>
+    <div class="card kpi"><div class="l">Top category</div><div class="v sm">${esc(topCat.name)}</div><div class="h">${rs(topCat.rev)} · ${num(topCat.pcs)} pcs</div></div>
+    <div class="card kpi"><div class="l">Best wholesaler</div><div class="v sm">${esc(cust(custList[0].id).name)}</div><div class="h">${rs(custList[0].rev)} · ${custList[0].orders} orders</div></div>
+    <div class="card kpi"><div class="l">Total sold</div><div class="v sm">${num(totPcs)} pcs</div><div class="h">${rs(totRev)} · avg ${rs(totRev / totPcs)}/pc</div></div>
+  </div>
+  <div class="card" style="margin-bottom:14px"><h2>What the numbers are telling you</h2>${sig.map(alertHtml).join('')}</div>
+  <div class="card tbl" style="margin-bottom:14px"><h2>Every item ranked — ${plabel.toLowerCase()}</h2><table>
+    <tr><th>#</th><th>Item</th><th class="n">Pcs sold</th><th>Share</th><th class="n">Revenue</th><th class="n">Avg price</th><th class="n">Orders</th><th class="n">Buyers</th>${days ? '<th class="n">vs before</th>' : ''}<th class="n">In stock</th><th class="n">Days left</th></tr>
+    ${items.map((r, i) => { const c = cover(r); return `<tr><td class="muted">${i + 1}</td><td>${i === 0 ? '🏆 ' : ''}${esc(label(r.key))}</td><td class="n"><b>${num(r.pcs)}</b></td>
+      <td><span class="meter"><i style="width:${r.pcs / best.pcs * 100}%"></i></span> ${Math.round(r.pcs / totPcs * 100)}%</td><td class="n">${rs(r.rev)}</td><td class="n">${rs(r.rev / r.pcs)}</td>
+      <td class="n">${r.orders}</td><td class="n">${r.custs.size}</td>${days ? `<td class="n">${trend(r)}</td>` : ''}<td class="n">${num(ST(r.key).qty)}</td>
+      <td class="n ${c <= S.settings.runoutDays ? 'low' : ''}">${c === 0 ? 'OUT' : c === Infinity ? '—' : Math.round(c)}</td></tr>`; }).join('')}
+  </table></div>
+  <div class="grid half">
+    <div class="card tbl"><h2>By category</h2><table><tr><th>Category</th><th class="n">Pcs</th><th class="n">Revenue</th><th>Share</th></tr>
+      ${cats.map(c => `<tr><td>${esc(c.name)}</td><td class="n">${num(c.pcs)}</td><td class="n">${rs(c.rev)}</td><td><span class="meter"><i style="width:${c.rev / cats[0].rev * 100}%"></i></span> ${Math.round(c.rev / totRev * 100)}%</td></tr>`).join('')}
+      </table><h2 style="margin-top:16px">By grade</h2><table><tr><th>Grade</th><th class="n">Pcs</th><th class="n">Revenue</th><th class="n">Avg price</th></tr>
+      ${grades.map(g => `<tr><td><span class="g g-${g.name}">${g.name}</span></td><td class="n">${num(g.pcs)}</td><td class="n">${rs(g.rev)}</td><td class="n">${rs(g.rev / g.pcs)}</td></tr>`).join('')}</table></div>
+    <div class="card tbl"><h2>Top wholesalers</h2><table><tr><th>Wholesaler</th><th class="n">Orders</th><th class="n">Pcs</th><th class="n">Revenue</th><th class="n">Owes</th></tr>
+      ${custList.slice(0, 10).map(c => `<tr><td>${esc(cust(c.id).name)}</td><td class="n">${c.orders}</td><td class="n">${num(c.pcs)}</td><td class="n">${rs(c.rev)}</td><td class="n">${rs(custDue(c.id))}</td></tr>`).join('')}</table>
+      <h2 style="margin-top:16px">Top brands sorted <span class="muted" style="font-weight:400">(all time)</span></h2>
+      ${S.brands.length ? `<table><tr><th>Brand</th><th class="n">Pieces</th><th class="n">A-grade</th><th>Last seen</th></tr>
+      ${S.brands.filter(b => b.brand !== 'No brand').slice(0, 10).map(b => `<tr><td>${esc(b.brand)}</td><td class="n">${num(b.pieces)}</td><td class="n">${Math.round(b.a_pieces / b.pieces * 100)}%</td><td class="muted">${since(b.last_seen)}</td></tr>`).join('')}</table>`
+      : '<p class="muted">Brands fill in as pieces go through the sorting boxes.</p>'}</div>
+  </div>`;
+};
+
+PAGES.bales = () => head('Bales in', 'Every landa bale you buy — log it the day it arrives', `<button class="btn ghost" data-act="csv" data-id="bales">Export CSV</button><button class="btn" data-act="newBale">+ New bale</button>`) +
+  `<div class="card tbl"><table><tr><th>ID</th><th>Date</th><th>Supplier</th><th>Type</th><th class="n">Kg</th><th class="n">Cost</th><th class="n">Rs/kg</th><th>Status</th><th class="n">Pieces</th><th class="n">A-grade</th><th></th></tr>
+  ${S.bales.map(b => { const p = sum(Object.values(b.yield), q => q), a = sum(Object.entries(b.yield).filter(([k]) => k.endsWith('|A')), e => e[1]);
+    return `<tr><td>${b.id}</td><td>${b.date}</td><td>${esc(b.supplier)}</td><td>${esc(b.type)}</td><td class="n">${num(b.weightKg)}</td><td class="n">${rs(b.cost)}</td><td class="n">${num(b.cost / b.weightKg)}</td>
+    <td>${pill(b.status)}${b.status !== 'sorted' && age(b.date) >= S.settings.sortDays ? ` <span class="low">${age(b.date)}d</span>` : ''}</td>
+    <td class="n">${p ? num(p) : '—'}</td><td class="n">${p ? Math.round(a / p * 100) + '%' : '—'}</td>
+    <td>${b.status !== 'sorted' ? `<a class="btn sm" href="#sorting/${b.id}">${b.status === 'sorting' ? 'Continue' : 'Sort now'}</a>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="11" class="empty">No bales yet — add your first one.</td></tr>'}
+  </table></div>`;
+
+let handOpen = false;
+PAGES.sorting = id => {
+  const open = S.bales.filter(b => b.status !== 'sorted');
+  if (!open.length) return head('Sorting', 'Nothing waiting to be sorted') + '<div class="card empty">All bales are sorted. Log a new bale under <a href="#bales">Bales in</a>.</div>';
+  const b = open.find(x => x.id === id) || open.find(x => x.id === S.live.baleId) || open[0];
+  const isLive = S.live.baleId === b.id;
+  const cat = isLive && S.live.category ? S.live.category : S.categories[0];
+  const tot = sum(Object.values(b.yield), q => q);
+  return head('Sorting', 'Every piece goes into stock the moment it is counted') + `
+  <div class="tabs">${open.map(x => `<a href="#sorting/${x.id}" class="${x.id === b.id ? 'on' : ''}">${S.live.baleId === x.id ? '🟢 ' : ''}${x.id} · ${esc(x.type)} · ${age(x.date)}d</a>`).join('')}</div>
+  <div class="card">
+    <div class="head"><div><h2>${b.id} — ${esc(b.type)} from ${esc(b.supplier)}</h2>
+      <p class="muted" style="margin:-6px 0 0">${b.weightKg} kg · ${rs(b.cost)} · <b>${num(tot)} pcs so far</b>${tot ? ` · ${(tot / b.weightKg).toFixed(1)} pcs/kg · ${rs(b.cost / tot)}/pc` : ''}</p></div>
+      <div class="btns">${isLive ? '<span class="pill p-delivered">● LIVE — sensor boxes count into this bale</span>' : `<button class="btn" data-act="goLive" data-id="${b.id}">▶ Make this the live bale</button>`}
+      <button class="btn ghost" data-act="finishBale" data-id="${b.id}">✓ Finish bale</button></div></div>
+    ${isLive ? livePanel(b, cat) : `<p class="muted">Make this the live bale to count with the sensor boxes or the A / B / C buttons.${S.live.baleId ? ` Right now <b>${S.live.baleId}</b> is live.` : ''}</p>`}
+  </div>
+  <details class="card" style="margin-top:14px" id="handCount" ${handOpen || !isLive ? 'open' : ''}><summary><b>Count by hand instead</b> <span class="muted">— type the size of each pile</span></summary>
+  <form id="sortForm"><div class="tbl"><table class="sortgrid"><tr><th>Category</th>${GRADES.map(g => `<th class="n">${g}</th>`).join('')}<th class="n">Total</th></tr>
+  ${S.categories.map(c => `<tr><td>${esc(c)}</td>${GRADES.map(g => `<td class="n"><input type="number" min="0" name="${esc(c + '|' + g)}" placeholder="0"></td>`).join('')}<td class="n" data-rt="${esc(c)}">0</td></tr>`).join('')}
+  </table></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:10px">
+    <div id="sortSum" class="muted"></div>
+    <div class="btns"><label class="muted"><input type="checkbox" name="finish" data-nokeep checked> finish bale after adding</label><button class="btn" type="submit">Add to stock</button></div></div></form></details>`;
+};
+function livePanel(b, cat) {
+  const y = b.yield;
+  const dev = S.devices.length
+    ? S.devices.map(d => { const fresh = d.last_seen && Date.now() - new Date(d.last_seen) < 10 * 60e3; return `<span class="pill ${fresh ? 'p-delivered' : 'p-cancelled'}">📡 ${esc(d.name)} · ${d.last_seen ? 'last count ' + since(d.last_seen) : 'not connected yet'}</span>`; }).join(' ')
+    : '<span class="muted">No sensor box connected yet — use the buttons, or keys <b>A B C R</b> (U = undo)</span>';
+  return `<div class="liverow"><label>Category being sorted now<select id="liveCat" data-nokeep>${S.categories.map(c => `<option ${c === cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label><div>${dev}</div></div>
+  <div class="counters">${GRADES.map(g => `<button class="gbtn g-${g}" data-act="piece" data-id="${g}"><span>${g === 'Reject' ? 'Reject' : 'Grade ' + g}</span><b>${num(y[cat + '|' + g] || 0)}</b><small>+1 ${esc(cat)}</small></button>`).join('')}
+    <button class="gbtn undo" data-act="undo"><span>Undo</span><b>↶</b><small>remove last piece</small></button></div>
+  <h2>Latest pieces ${S.pending.length ? `<span class="pill p-packed">${S.pending.length} waiting for a brand</span>` : ''}</h2>
+  <div class="tbl"><table><tr><th>#</th><th>Time</th><th>Grade</th><th>Category</th><th>Brand</th><th>From</th></tr>
+  ${S.recent.map((p, i) => `<tr class="${i === 0 ? 'flash' : ''}"><td class="muted">${p.id}</td><td>${clock(p.created_at)}</td><td><span class="g g-${p.grade}">${p.grade}</span></td><td>${esc(p.category)}</td>
+    <td>${p.brand ? `<a href="#" data-act="editBrand" data-id="${p.id}">${esc(p.brand)}</a>` : `<button class="btn sm" data-act="editBrand" data-id="${p.id}">Add brand</button>`}</td><td class="muted">${p.source === 'sensor' ? '📡 sensor' : '👆 button'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No pieces yet — throw the first one in!</td></tr>'}
+  </table></div>`;
+}
+AFTER.sorting = id => {
+  const d = $('#handCount'); if (d) d.addEventListener('toggle', () => handOpen = d.open);
+  const lc = $('#liveCat');
+  if (lc) lc.addEventListener('change', () => q(tb('live_sorting_session').update({category: lc.value, updated_at: new Date().toISOString()}).eq('id', 1)).then(refresh).catch(e => toast(e.message)));
+  const f = $('#sortForm'); if (!f) return;
+  const open = S.bales.filter(b => b.status !== 'sorted');
+  const b = open.find(x => x.id === id) || open.find(x => x.id === S.live.baleId) || open[0];
+  const read = () => { const y = {}; [...f.querySelectorAll('input[type=number]')].forEach(i => { if (+i.value > 0) y[i.name] = Math.floor(+i.value); }); return y; };
+  const upd = () => {
+    const y = read(), t = sum(Object.values(y), q => q), a = sum(Object.entries(y).filter(([k]) => k.endsWith('|A')), e => e[1]);
+    S.categories.forEach(c => { const el = f.querySelector(`[data-rt="${CSS.escape(c)}"]`); if (el) el.textContent = num(sum(GRADES, g => y[c + '|' + g])); });
+    $('#sortSum').innerHTML = t ? `<b>${num(t)} pcs</b> · A-grade ${Math.round(a / t * 100)}%` : 'Type the count for each pile';
+  };
+  f.addEventListener('input', upd); upd();
+  f.addEventListener('submit', async e => {
+    e.preventDefault();
+    const y = read(), finish = f.finish.checked;
+    if (!Object.keys(y).length && !finish) return toast('Enter at least one count');
+    const btn = f.querySelector('[type=submit]'); btn.disabled = true;
+    try {
+      await rpc('record_bulk_sorting', {p_bale: b.id, p_yields: Object.entries(y).map(([k, qty]) => { const [category, grade] = k.split('|'); return {category, grade, qty}; }), p_finish: finish});
+      f.reset(); toast(`${b.id} updated — stock added`);
+      if (finish) location.hash = '#inventory'; else refresh();
+    } catch (err) { toast(err.message); btn.disabled = false; }
+  });
+};
+
+/* brand popup — one per piece counted */
+let brandShowing = null, brandSnooze = 0;
+function maybeBrandPopup() {
+  const m = $('#modal');
+  if (route()[0] !== 'sorting' || !S.pending.length) { if (!m.hidden && m.dataset.kind === 'brand' && !m.dataset.edit) m.hidden = true; return; }
+  if (!m.hidden && m.dataset.kind !== 'brand') return;
+  const next = S.pending.find(p => p.id > brandSnooze);
+  if (!next) return;
+  if (!m.hidden && m.dataset.edit) return;
+  if (!m.hidden && brandShowing === next.id) { const w = m.querySelector('#waiting'); if (w) w.textContent = S.pending.length > 1 ? `${S.pending.length - 1} more waiting` : ''; return; }
+  openBrand(next);
+}
+function openBrand(p, edit) {
+  brandShowing = p.id;
+  const quick = S.brands.filter(b => b.brand !== 'No brand').slice(0, 12);
+  const f = modal(edit ? `Change brand — piece #${p.id}` : `Which brand? — piece #${p.id}`, `
+    <p class="bigpiece"><span class="g g-${p.grade}">${p.grade}</span> <b>${esc(p.category)}</b> · bale ${p.bale_id} · ${clock(p.created_at)}
+      <span class="pill p-packed" id="waiting">${!edit && S.pending.length > 1 ? `${S.pending.length - 1} more waiting` : ''}</span></p>
+    <div class="brandbtns">${quick.map(b => `<button type="button" class="btn ghost" data-brand="${esc(b.brand)}">${esc(b.brand)}</button>`).join('')}
+      <button type="button" class="btn ghost" data-brand="No brand" style="border-style:dashed">No brand / skip</button></div>
+    <label>Brand<input name="brand" list="brandlist" placeholder="Type a brand and press Enter" autocomplete="off" value="${esc(p.brand || '')}"></label>
+    <datalist id="brandlist">${S.brands.map(b => `<option value="${esc(b.brand)}">`).join('')}</datalist>`,
+    async f => {
+      const v = f.brand.value.trim();
+      if (!v) return 'Type a brand, or press "No brand / skip"';
+      await q(tb('sorted_pieces').update({brand: v}).eq('id', p.id));
+    }, 'Save brand', 'brand');
+  $('#modal').dataset.edit = edit ? '1' : '';
+  f.querySelectorAll('[data-brand]').forEach(b => b.onclick = () => { f.brand.value = b.dataset.brand; f.requestSubmit(); });
+  f.querySelector('[data-close]').addEventListener('click', () => { if (!edit) brandSnooze = Math.max(...S.pending.map(x => x.id)); });
+}
+
+PAGES.inventory = cat => {
+  const v = velocity(), cats = S.categories.filter(c => !cat || c === decodeURIComponent(cat));
+  return head('Inventory', 'Live stock by category and grade. Red = below your minimum.', `<button class="btn ghost" data-act="csv" data-id="inventory">Export CSV</button>`) +
+  `<div class="tabs"><a href="#inventory" class="${!cat ? 'on' : ''}">All</a>${S.categories.map(c => `<a href="#inventory/${encodeURIComponent(c)}" class="${cat && decodeURIComponent(cat) === c ? 'on' : ''}">${esc(c)}</a>`).join('')}</div>
+  <div class="card tbl"><table><tr><th>Category</th><th>Grade</th><th class="n">In stock</th><th class="n">Minimum</th><th class="n">Price / pc</th><th class="n">Value</th><th class="n">Sold 14d</th><th class="n">Days left</th><th></th></tr>
+  ${cats.flatMap(c => GRADES.map(g => { const k = c + '|' + g, s = ST(k), sold = v[k] || 0, cover = sold ? s.qty / (sold / 14) : null, low = s.min > 0 && s.qty <= s.min;
+    return `<tr><td>${esc(c)}</td><td><span class="g g-${g}">${g}</span></td><td class="n ${low ? 'low' : ''}">${num(s.qty)}</td><td class="n muted">${s.min || '—'}</td><td class="n">${rs(s.price)}</td><td class="n">${rs(s.qty * s.price)}</td>
+    <td class="n">${sold || '—'}</td><td class="n ${cover !== null && cover <= S.settings.runoutDays ? 'low' : ''}">${cover === null ? '—' : s.qty <= 0 ? 'OUT' : Math.round(cover)}</td>
+    <td><button class="btn ghost sm" data-act="editStock" data-id="${esc(k)}">Edit</button></td></tr>`; })).join('')}
+  </table></div>`;
+};
+
+PAGES.orders = filter => {
+  const list = S.orders.filter(o => !filter || o.status === filter);
+  const tabs = [['', 'All'], ...FLOW.map(s => [s, LABEL[s]]), ['cancelled', 'Cancelled']];
+  const next = {new: ['packed', 'Mark packed'], packed: ['dispatched', 'Dispatch'], dispatched: ['delivered', 'Delivered']};
+  return head('Orders', 'New → Packed → Dispatched → Delivered. Stock is reserved the moment an order is created.', `<button class="btn ghost" data-act="csv" data-id="orders">Export CSV</button><button class="btn" data-act="newOrder">+ New order</button>`) +
+  `<div class="tabs">${tabs.map(([s, t]) => `<a href="#orders${s ? '/' + s : ''}" class="${(filter || '') === s ? 'on' : ''}">${t} (${s ? S.orders.filter(o => o.status === s).length : S.orders.length})</a>`).join('')}</div>
+  <div class="card tbl"><table><tr><th>ID</th><th>Date</th><th>Wholesaler</th><th>Items</th><th class="n">Pcs</th><th class="n">Total</th><th class="n">Due</th><th>Status</th><th>Courier</th><th>Actions</th></tr>
+  ${list.map(o => { const c = cust(o.customerId), d = due(o), n = next[o.status];
+    return `<tr><td>${o.id}</td><td>${o.date}</td><td>${esc(c.name)}<div class="muted" style="font-size:12px">${esc(c.city)}</div></td>
+    <td style="white-space:normal;min-width:180px;font-size:12px">${o.lines.map(l => `${esc(label(l.key))} × ${l.qty}`).join('<br>')}</td>
+    <td class="n">${num(sum(o.lines, l => l.qty))}</td><td class="n">${rs(total(o))}</td>
+    <td class="n ${d > 0 && age(o.date) >= S.settings.dueDays ? 'low' : ''}">${d > 0 ? rs(d) : o.status === 'cancelled' ? '—' : '<span style="color:var(--ok)">Paid</span>'}</td>
+    <td>${pill(o.status)}</td><td style="font-size:12px">${o.courier ? `${esc(o.courier)}<div class="muted">${esc(o.tracking || '')}</div>` : '—'}</td>
+    <td><div class="btns">${n ? `<button class="btn sm" data-act="advance" data-id="${o.id}">${n[1]}</button>` : ''}
+      ${d > 0 ? `<button class="btn ghost sm" data-act="pay" data-id="${o.id}">+ Payment</button>` : ''}
+      <button class="btn ghost sm" data-act="slip" data-id="${o.id}">Slip</button>
+      ${o.status === 'dispatched' || o.status === 'packed' ? `<button class="btn ghost sm" data-act="wa" data-id="${o.id}">WhatsApp</button>` : ''}
+      ${o.status === 'new' || o.status === 'packed' ? `<button class="btn red sm" data-act="cancel" data-id="${o.id}">Cancel</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="10" class="empty">No orders here.</td></tr>'}
+  </table></div>`;
+};
+
+PAGES.customers = () => head('Wholesalers', 'Who buys from you, how much, and who owes what', `<button class="btn ghost" data-act="csv" data-id="customers">Export CSV</button><button class="btn" data-act="editCust">+ Add wholesaler</button>`) +
+  `<div class="card tbl"><table><tr><th>Name</th><th>City</th><th>Phone</th><th class="n">Orders</th><th class="n">Bought (all time)</th><th class="n">Owes</th><th class="n">Credit limit</th><th>Last order</th><th></th></tr>
+  ${S.customers.map(c => { const os = S.orders.filter(o => o.customerId === c.id && live(o)), d = custDue(c.id);
+    return `<tr><td>${esc(c.name)}</td><td>${esc(c.city)}</td><td>${esc(c.phone)}</td><td class="n">${os.length}</td><td class="n">${rs(sum(os, total))}</td>
+    <td class="n ${c.limit && d > c.limit ? 'low' : ''}">${rs(d)}</td><td class="n muted">${c.limit ? rs(c.limit) : '—'}</td><td>${os[0] ? os[0].date + ` <span class="muted">(${age(os[0].date)}d)</span>` : '—'}</td>
+    <td><div class="btns"><button class="btn ghost sm" data-act="editCust" data-id="${c.id}">Edit</button>${d > 0 ? `<button class="btn ghost sm" data-act="remind" data-id="${c.id}">Payment reminder</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="9" class="empty">No wholesalers yet.</td></tr>'}
+  </table></div>`;
+
+PAGES.alerts = () => {
+  const A = alerts();
+  return head('Alerts & signals', 'Red = act today · Amber = falling behind · Blue = business signal', `<button class="btn ghost" data-act="waDigest">Send to WhatsApp</button><button class="btn" data-act="emailDigest">Email digest</button>`) +
+  `<div class="card">${A.map(alertHtml).join('') || '<div class="empty">Nothing to worry about right now 👌</div>'}</div>
+  <div class="card" style="margin-top:14px"><h2>Recent activity</h2><div class="tbl"><table>${S.log.slice(0, 40).map(l => `<tr><td class="muted" style="width:110px">${l.d}</td><td>${esc(l.t)}</td></tr>`).join('')}</table></div></div>`;
+};
+
+PAGES.settings = () => {
+  const s = S.settings;
+  const f = (k, t, type = 'number') => `<label>${t}<input type="${type}" name="${k}" value="${esc(s[k])}"></label>`;
+  return head('Settings', 'Alert rules, categories, sensor boxes and your data') + `
+  <form class="card" id="setForm"><h2>Business & alert rules</h2><div class="set">
+    ${f('bizName', 'Business name', 'text')}${f('alertEmail', 'Send alert emails to', 'email')}
+    ${f('sortDays', 'Warn if a bale is unsorted after (days)')}${f('dispatchDays', 'Warn if an order is not dispatched after (days)')}
+    ${f('dueDays', 'Payment overdue after (days)')}${f('runoutDays', '"Selling fast" when stock lasts less than (days)')}${f('deadDays', '"Not moving" if no sale in (days)')}
+    ${f('lockoutSeconds', 'Sensor box lockout after each piece (seconds)')}
+  </div><div style="margin-top:14px"><button class="btn">Save settings</button></div></form>
+  <div class="card" style="margin-top:14px"><h2>Categories</h2><p class="muted">Every category gets grades ${GRADES.join(', ')}. Set prices & minimums on the Inventory page.</p>
+    <p>${S.categories.map(c => `<span class="pill p-new" style="margin:0 4px 4px 0">${esc(c)}</span>`).join('')}</p>
+    <form id="catForm" class="btns"><input name="c" data-nokeep placeholder="e.g. Bedsheets" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font:inherit"><button class="btn">Add category</button></form></div>
+  <div class="card" style="margin-top:14px"><h2>Sensor boxes</h2><p class="muted">Each ESP32 control box needs its own ID and secret key.</p>
+    ${S.devices.length ? `<table><tr><th>ID</th><th>Name</th><th>Last count</th></tr>${S.devices.map(d => `<tr><td>${d.id}</td><td>${esc(d.name)}</td><td class="muted">${d.last_seen ? since(d.last_seen) : 'never'}</td></tr>`).join('')}</table>` : ''}
+    <div style="margin-top:10px"><button class="btn ghost" data-act="newDevice">+ Add sensor box</button></div></div>
+  <div class="card" style="margin-top:14px"><h2>Your data</h2><p class="muted">Everything is saved in the online database and synced live to every logged-in screen.</p>
+    <div class="btns"><button class="btn ghost" data-act="backup">Download backup</button>
+    <button class="btn ghost" data-act="demo">Load demo data</button><button class="btn red" data-act="wipe">Wipe everything (fresh start)</button>
+    <button class="btn ghost" data-act="logout">Log out of this device</button></div></div>`;
+};
+AFTER.settings = () => {
+  $('#setForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target, n = k => Math.max(0, +f[k].value || 0);
+    try {
+      await q(tb('settings').update({biz_name: f.bizName.value.trim() || 'My Landa Business', alert_email: f.alertEmail.value.trim(), sort_days: n('sortDays'), dispatch_days: n('dispatchDays'),
+        due_days: n('dueDays'), runout_days: n('runoutDays'), dead_days: n('deadDays'), sensor_lockout_seconds: n('lockoutSeconds'), updated_at: new Date().toISOString()}).eq('id', 1));
+      toast('Settings saved'); refresh();
+    } catch (err) { toast(err.message); }
+  });
+  $('#catForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const c = e.target.c.value.trim();
+    if (!c || c.includes('|')) return;
+    try { await rpc('add_category', {p_name: c}); e.target.reset(); toast(`Added ${c}`); refresh(); } catch (err) { toast(err.message); }
+  });
+};
+
+/* ---------- modals ---------- */
+function modal(title, body, onSave, saveText = 'Save', kind = '') {
+  const m = $('#modal');
+  m.innerHTML = `<form><h2>${title}</h2>${body}<div class="foot"><span class="err"></span><div class="btns"><button type="button" class="btn ghost" data-close>Close</button><button class="btn" type="submit">${saveText}</button></div></div></form>`;
+  m.dataset.kind = kind; m.dataset.edit = '';
+  m.hidden = false;
+  const f = m.querySelector('form');
+  f.querySelector('[data-close]').onclick = () => m.hidden = true;
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const btn = f.querySelector('[type=submit]'); btn.disabled = true;
+    try {
+      const err = await onSave(f);
+      if (err) f.querySelector('.err').textContent = err;
+      else { m.hidden = true; await refresh(); }
+    } catch (x) { f.querySelector('.err').textContent = x.message; }
+    btn.disabled = false;
+  };
+  const first = f.querySelector('input:not([type=hidden]),select'); first && first.focus();
+  return f;
+}
+const ACT = {
+  newBale() {
+    const sups = [...new Set(S.bales.map(b => b.supplier))];
+    modal('New bale received', `<datalist id="sups">${sups.map(s => `<option value="${esc(s)}">`).join('')}</datalist>
+      <div class="row"><label>Date<input type="date" name="date" value="${today()}" required></label><label>Supplier<input name="supplier" list="sups" required></label></div>
+      <label>Bale type / grade<input name="type" placeholder="e.g. Mixed Ladies, Jeans, Winter" required></label>
+      <div class="row"><label>Weight (kg)<input type="number" name="weightKg" min="1" step="any" required></label><label>Total cost incl. transport (Rs)<input type="number" name="cost" min="0" required></label></div>`,
+      async f => { const id = await rpc('add_bale', {p_date: f.date.value, p_supplier: f.supplier.value, p_type: f.type.value, p_weight: +f.weightKg.value, p_cost: +f.cost.value}); toast(`${id} logged — sort it when ready`); });
+  },
+  editStock(k) {
+    const s = ST(k), [category, grade] = k.split('|');
+    modal(esc(label(k)), `<div class="row"><label>Pieces in stock (stock count)<input type="number" name="qty" value="${s.qty}"></label><label>Selling price / pc (Rs)<input type="number" name="price" min="0" value="${s.price}"></label></div>
+      <label>Alert me when stock falls to (pcs)<input type="number" name="min" min="0" value="${s.min}"></label>`,
+      f => rpc('update_stock_item', {p_category: category, p_grade: grade, p_qty: Math.round(+f.qty.value), p_price: +f.price.value, p_min: Math.round(+f.min.value)}).then(() => null));
+  },
+  newOrder() {
+    if (!S.customers.length) { toast('Add a wholesaler first'); location.hash = '#customers'; return; }
+    const opts = Object.entries(S.stock).filter(([, v]) => v.qty > 0).map(([k, v]) => `<option value="${esc(k)}">${esc(label(k))} — ${num(v.qty)} left</option>`).join('');
+    if (!opts) { toast('Nothing in stock to sell yet'); return; }
+    const row = () => `<div class="line"><select name="key">${opts}</select><input name="qty" type="number" min="1" placeholder="Qty"><input name="price" type="number" min="0" placeholder="Rs/pc"><button type="button" class="x">×</button></div>`;
+    const f = modal('New order', `<div class="row"><label>Wholesaler<select name="cust">${S.customers.map(c => `<option value="${c.id}">${esc(c.name)} — ${esc(c.city)}</option>`).join('')}</select></label>
+      <label>Date<input type="date" name="date" value="${today()}"></label></div>
+      <label>Items <span class="muted" style="font-weight:400">(item · qty · price per piece)</span></label><div id="lines">${row()}</div>
+      <button type="button" class="btn ghost sm" id="addLine">+ Add item</button>
+      <div class="row" style="margin-top:12px"><label>Advance received (Rs)<input type="number" name="paid" value="0" min="0"></label><label>Order total<input id="ot" disabled></label></div>
+      <div id="credit" class="err"></div>`,
+      async f => {
+        const lines = [...f.querySelectorAll('.line')].map(r => { const [category, grade] = r.querySelector('[name=key]').value.split('|'); return {category, grade, qty: Math.floor(+r.querySelector('[name=qty]').value), price: +r.querySelector('[name=price]').value}; });
+        if (!lines.length || lines.some(l => !(l.qty > 0))) return 'Every item needs a quantity';
+        const id = await rpc('create_order', {p_customer: f.cust.value, p_date: f.date.value, p_lines: lines, p_paid: +f.paid.value || 0});
+        toast(`${id} created — stock reserved`);
+      }, 'Create order');
+    const setPrice = r => { r.querySelector('[name=price]').value = ST(r.querySelector('[name=key]').value).price; };
+    const upd = () => {
+      const t = sum([...f.querySelectorAll('.line')], r => +r.querySelector('[name=qty]').value * +r.querySelector('[name=price]').value);
+      f.querySelector('#ot').value = rs(t);
+      const c = S.customers.find(x => x.id === f.cust.value), d = custDue(c.id);
+      f.querySelector('#credit').textContent = c.limit && d + t - (+f.paid.value || 0) > c.limit ? `⚠ ${c.name} already owes ${rs(d)} — this order takes them over their ${rs(c.limit)} limit` : '';
+    };
+    f.querySelectorAll('.line').forEach(setPrice);
+    f.querySelector('#addLine').onclick = () => { f.querySelector('#lines').insertAdjacentHTML('beforeend', row()); setPrice(f.querySelector('.line:last-child')); };
+    f.addEventListener('click', e => { if (e.target.classList.contains('x')) { e.target.parentNode.remove(); upd(); } });
+    f.addEventListener('change', e => { if (e.target.name === 'key') setPrice(e.target.parentNode); upd(); });
+    f.addEventListener('input', upd); upd();
+  },
+  async advance(id) {
+    const o = S.orders.find(x => x.id === id);
+    if (o.status === 'packed') {
+      return modal(`Dispatch ${o.id}`, `<div class="row"><label>Courier / transport<select name="courier">${COURIERS.map(c => `<option>${c}</option>`).join('')}</select></label><label>Tracking / bilty no.<input name="tracking"></label></div>
+        <p class="muted">After saving, hit “WhatsApp” on the order to send the tracking to ${esc(cust(o.customerId).name)}.</p>`,
+        async f => { await rpc('set_order_status', {p_order: o.id, p_status: 'dispatched', p_courier: f.courier.value, p_tracking: f.tracking.value}); toast(`${o.id} dispatched`); }, 'Mark dispatched');
+    }
+    const nxt = FLOW[FLOW.indexOf(o.status) + 1];
+    await rpc('set_order_status', {p_order: o.id, p_status: nxt}); toast(`${o.id} → ${LABEL[nxt]}`); refresh();
+  },
+  async cancel(id) { if (confirm(`Cancel ${id}? Stock goes back into inventory.`)) { await rpc('set_order_status', {p_order: id, p_status: 'cancelled'}); refresh(); } },
+  pay(id) {
+    const o = S.orders.find(x => x.id === id);
+    modal(`Payment for ${o.id}`, `<p>${esc(cust(o.customerId).name)} owes <b>${rs(due(o))}</b> of ${rs(total(o))}.</p><label>Amount received (Rs)<input type="number" name="amt" min="1" value="${due(o)}"></label>`,
+      async f => { if (!(+f.amt.value > 0)) return 'Enter an amount'; await rpc('add_payment', {p_order: o.id, p_amount: +f.amt.value}); toast('Payment recorded'); });
+  },
+  editCust(id) {
+    const c = S.customers.find(x => x.id === id) || {};
+    modal(id ? 'Edit wholesaler' : 'New wholesaler', `<label>Name / shop<input name="name" value="${esc(c.name)}" required></label>
+      <div class="row"><label>City<input name="city" value="${esc(c.city)}"></label><label>WhatsApp (92300…)<input name="phone" value="${esc(c.phone)}"></label></div>
+      <label>Credit limit (Rs, 0 = none)<input type="number" name="limit" min="0" value="${c.limit || 0}"></label>`,
+      async f => { await rpc('save_customer', {p_id: id || null, p_name: f.name.value, p_city: f.city.value, p_phone: f.phone.value.replace(/\D/g, ''), p_limit: +f.limit.value || 0}); });
+  },
+  async goLive(id) {
+    await q(tb('live_sorting_session').update({bale_id: id, category: S.live.category || S.categories[0], updated_at: new Date().toISOString()}).eq('id', 1));
+    toast(`${id} is now live — sensor boxes count into it`); refresh();
+  },
+  async piece(grade) {
+    await rpc('record_one_piece', {p_grade: grade});
+    refresh();
+  },
+  async undo() {
+    const r = await rpc('undo_last_piece', {});
+    toast(r ? `Removed piece #${r}` : 'Nothing to undo'); refresh();
+  },
+  async finishBale(id) {
+    const b = S.bales.find(x => x.id === id), t = sum(Object.values(b.yield), q => q);
+    if (!confirm(`Finish ${id}? ${num(t)} pcs have been counted. You can't add more pieces to it after this.`)) return;
+    await rpc('finish_bale_sorting', {p_bale: id}); toast(`${id} finished`); refresh();
+  },
+  editBrand(id) {
+    const p = S.recent.find(x => x.id === +id) || S.pending.find(x => x.id === +id);
+    if (p) openBrand({bale_id: S.live.baleId, ...p}, true);
+  },
+  newDevice() {
+    modal('Add sensor box', `<label>Name<input name="name" placeholder="e.g. Sorting table 1" required></label>`, async f => {
+      const d = await rpc('create_sensor_device', {p_name: f.name.value});
+      setTimeout(() => modal('Sensor box added', `<p>Put these into the ESP32 code. <b>The key is shown only once</b> — copy it now.</p>
+        <label>Device ID<input readonly value="${esc(d.id)}"></label><label>Secret key<input readonly value="${esc(d.key)}"></label>`, () => null, 'Done'), 50);
+    }, 'Create');
+  },
+  wa(id) {
+    const o = S.orders.find(x => x.id === id), c = cust(o.customerId);
+    const msg = o.status === 'dispatched'
+      ? `Assalam o Alaikum ${c.name},\nYour order ${o.id} (${num(sum(o.lines, l => l.qty))} pcs) has been dispatched via ${o.courier || 'courier'}${o.tracking ? `, tracking ${o.tracking}` : ''}.\nTotal ${rs(total(o))}, balance due ${rs(due(o))}.\n— ${S.settings.bizName}`
+      : `Assalam o Alaikum ${c.name},\nYour order ${o.id} is packed and ready (${num(sum(o.lines, l => l.qty))} pcs, ${rs(total(o))}). We will dispatch shortly.\n— ${S.settings.bizName}`;
+    window.open(`https://wa.me/${c.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+  },
+  remind(id) {
+    const c = cust(id), os = S.orders.filter(o => o.customerId === id && due(o) > 0);
+    const msg = `Assalam o Alaikum ${c.name},\nFriendly reminder of your pending balance with ${S.settings.bizName}:\n${os.map(o => `• ${o.id} (${o.date}): ${rs(due(o))}`).join('\n')}\nTotal: ${rs(custDue(id))}\nJazakAllah.`;
+    window.open(`https://wa.me/${c.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+  },
+  emailDigest() {
+    const to = S.settings.alertEmail;
+    if (!to) { toast('Set an alert email in Settings first'); location.hash = '#settings'; return; }
+    const A = alerts(), bs = bestSeller(30);
+    const body = `${S.settings.bizName} — daily digest ${today()}\n\n${A.map(a => `[${a.type}] ${a.text}`).join('\n') || 'All clear.'}\n\nBest seller (30 days): ${bs ? `${label(bs.key)} — ${bs.pcs} pcs` : '—'}\nStock: ${num(sum(Object.values(S.stock), s => s.qty))} pcs · To collect: ${rs(sum(S.orders, due))}`;
+    location.href = `mailto:${to}?subject=${encodeURIComponent(`${S.settings.bizName}: ${A.length} alerts (${today()})`)}&body=${encodeURIComponent(body)}`;
+  },
+  waDigest() {
+    const A = alerts();
+    window.open(`https://wa.me/?text=${encodeURIComponent(`*${S.settings.bizName} — ${today()}*\n\n${A.map(a => `• *${a.type}*: ${a.text}`).join('\n') || 'All clear.'}`)}`, '_blank');
+  },
+  slip(id) {
+    const o = S.orders.find(x => x.id === id), c = cust(o.customerId), w = window.open('', '_blank');
+    w.document.write(`<title>${o.id}</title><body style="font:14px system-ui;padding:30px;max-width:700px">
+      <h2 style="margin:0">${esc(S.settings.bizName)}</h2><p>Invoice / packing slip <b>${o.id}</b> · ${o.date}</p>
+      <p><b>${esc(c.name)}</b><br>${esc(c.city)} · ${esc(c.phone)}</p>
+      <table style="width:100%;border-collapse:collapse" border="1" cellpadding="6"><tr><th align="left">Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr>
+      ${o.lines.map(l => `<tr><td>${esc(label(l.key))}</td><td align="right">${l.qty}</td><td align="right">${num(l.price)}</td><td align="right">${num(l.qty * l.price)}</td></tr>`).join('')}
+      <tr><td colspan="3" align="right"><b>Total</b></td><td align="right"><b>${rs(total(o))}</b></td></tr>
+      <tr><td colspan="3" align="right">Paid</td><td align="right">${rs(o.paid)}</td></tr>
+      <tr><td colspan="3" align="right"><b>Balance</b></td><td align="right"><b>${rs(due(o))}</b></td></tr></table>
+      <p>${o.courier ? `Sent via ${esc(o.courier)} ${esc(o.tracking || '')}` : ''}</p><script>print()<\/script>`);
+    w.document.close();
+  },
+  csv(what) {
+    const T2 = {
+      bales: [['ID', 'Date', 'Supplier', 'Type', 'Kg', 'Cost', 'Status', 'Pieces'], S.bales.map(b => [b.id, b.date, b.supplier, b.type, b.weightKg, b.cost, b.status, sum(Object.values(b.yield), q => q)])],
+      inventory: [['Category', 'Grade', 'Qty', 'Min', 'Price', 'Value'], Object.entries(S.stock).map(([k, s]) => [...k.split('|'), s.qty, s.min, s.price, s.qty * s.price])],
+      orders: [['ID', 'Date', 'Wholesaler', 'City', 'Items', 'Pieces', 'Total', 'Paid', 'Due', 'Status', 'Courier', 'Tracking'], S.orders.map(o => [o.id, o.date, cust(o.customerId).name, cust(o.customerId).city, o.lines.map(l => `${label(l.key)} x${l.qty}`).join('; '), sum(o.lines, l => l.qty), total(o), o.paid, due(o), o.status, o.courier || '', o.tracking || ''])],
+      customers: [['ID', 'Name', 'City', 'Phone', 'Credit limit', 'Owes'], S.customers.map(c => [c.id, c.name, c.city, c.phone, c.limit, custDue(c.id)])],
+    }[what];
+    const csv = [T2[0], ...T2[1]].map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n');
+    download(`${what}-${today()}.csv`, csv, 'text/csv');
+  },
+  backup() { download(`landa-backup-${today()}.json`, JSON.stringify(S, (k, v) => v instanceof Set ? [...v] : v), 'application/json'); },
+  async demo() {
+    if (!confirm('This WIPES all bales, orders and wholesalers and loads demo data. Continue?')) return;
+    await loadDemo();
+  },
+  async wipe() {
+    if (prompt('This deletes ALL bales, orders, wholesalers and history (categories and prices stay). Type WIPE to confirm.') !== 'WIPE') return;
+    await rpc('wipe_all_business_data'); toast('Everything wiped — fresh start'); refresh();
+  },
+  async logout() {
+    try { await sb.rpc(T('logout_dashboard')); } catch (e) {}
+    sessionStorage.removeItem(TOKEN_KEY); location.hash = ''; location.reload();
+  },
+};
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name; a.click(); }
+
+/* ---------- demo data ---------- */
+async function loadDemo() {
+  const say = t => toast(t, 60000);
+  say('Loading demo data… 0%');
+  await rpc('wipe_all_business_data');
+  const base = {'Ladies Tops': 250, 'Jeans': 450, 'Jackets': 900, 'Sweaters': 400, 'Men Shirts': 300, 'Kids Wear': 180}, mult = {A: 1, B: .6, C: .3, Reject: .08};
+  const cats = Object.keys(base);
+  for (const c of cats) await rpc('add_category', {p_name: c});
+  const price = (c, g) => Math.round(base[c] * mult[g] / 10) * 10;
+  await Promise.all(cats.flatMap(c => GRADES.map(g => rpc('update_stock_item', {p_category: c, p_grade: g, p_qty: 0, p_price: price(c, g), p_min: g === 'A' ? 60 : g === 'B' ? 40 : 0}))));
+  say('Loading demo data… 20%');
+  const mk = (cs, pcs, aPct) => cs.flatMap(c => {
+    const per = pcs / cs.length, a = Math.round(per * aPct), r = Math.round(per * .08), b = Math.round(per * (1 - aPct - .08) * .6);
+    return [['A', a], ['B', b], ['C', Math.round(per) - a - b - r], ['Reject', r]].map(([grade, qty]) => ({category: c, grade, qty}));
+  });
+  const bales = [
+    [28, 'UK Cream Export', 'Mixed Ladies', 450, 180000, 26, ['Ladies Tops', 'Jeans'], 1400, .45],
+    [24, 'Korea Mix Traders', 'Winter Mix', 500, 160000, 22, ['Jackets', 'Sweaters'], 900, .30],
+    [18, 'Gulf Bales (Dubai)', 'Mixed Men', 450, 120000, 16, ['Men Shirts', 'Jeans'], 1300, .22],
+    [10, 'UK Cream Export', 'Kids + Ladies', 300, 110000, 9, ['Kids Wear', 'Ladies Tops'], 1200, .48],
+    [6, 'Korea Mix Traders', 'Jeans', 450, 150000],
+    [1, 'Gulf Bales (Dubai)', 'Mixed Ladies', 450, 115000],
+  ];
+  const baleIds = [];
+  for (const [d, supplier, type, kg, cost, sd, cs, pcs, a] of bales) {
+    const id = await rpc('add_bale', {p_date: ago(d), p_supplier: supplier, p_type: type, p_weight: kg, p_cost: cost});
+    baleIds.push(id);
+    if (sd) await rpc('record_bulk_sorting', {p_bale: id, p_yields: mk(cs, pcs, a), p_finish: true, p_date: ago(sd)});
+  }
+  say('Loading demo data… 45%');
+  const cids = [];
+  for (const [name, city, phone, limit] of [['Haji Rafiq Traders', 'Karachi', '923001234567', 300000], ['Al-Madina Garments', 'Lahore', '923211234567', 250000],
+    ['Faisal Cloth House', 'Faisalabad', '923331234567', 60000], ['Karkhano Wholesale', 'Peshawar', '923451234567', 200000]])
+    cids.push(await rpc('save_customer', {p_id: null, p_name: name, p_city: city, p_phone: phone, p_limit: limit}));
+  const orders = [
+    [20, 0, [['Ladies Tops', 'A', 200], ['Jeans', 'A', 120]], 'delivered', 1],
+    [15, 1, [['Jackets', 'A', 80], ['Sweaters', 'B', 100]], 'delivered', .5],
+    [14, 2, [['Men Shirts', 'B', 200], ['Jeans', 'B', 150]], 'delivered', 0],
+    [12, 3, [['Jeans', 'A', 60], ['Ladies Tops', 'A', 90]], 'delivered', 1],
+    [8, 0, [['Jeans', 'A', 150], ['Kids Wear', 'A', 150]], 'dispatched', 0],
+    [5, 3, [['Jackets', 'B', 60], ['Sweaters', 'A', 80], ['Jeans', 'A', 100]], 'packed', 0],
+    [1, 1, [['Kids Wear', 'B', 120], ['Ladies Tops', 'B', 150], ['Jeans', 'A', 50]], 'new', .3],
+    [0, 2, [['Ladies Tops', 'A', 100]], 'new', 0],
+  ];
+  for (const [d, ci, lines, st, paidPct] of orders) {
+    const ls = lines.map(([category, grade, qty]) => ({category, grade, qty, price: price(category, grade)}));
+    const tot = sum(ls, l => l.qty * l.price);
+    const id = await rpc('create_order', {p_customer: cids[ci], p_date: ago(d), p_lines: ls, p_paid: Math.round(tot * paidPct)});
+    const steps = FLOW.slice(1, FLOW.indexOf(st) + 1);
+    for (let i = 0; i < steps.length; i++)
+      await rpc('set_order_status', {p_order: id, p_status: steps[i], p_courier: ['TCS', 'Daewoo Cargo', 'Leopards'][i % 3], p_tracking: 'TRK' + (700000 + d * 37), p_date: ago(Math.max(0, d - 1 - i))});
+  }
+  say('Loading demo data… 75%');
+  const live = baleIds[4];
+  await q(tb('live_sorting_session').update({bale_id: live, category: 'Jeans', updated_at: new Date().toISOString()}).eq('id', 1));
+  const brands = ["Levi's", "Levi's", 'Wrangler', 'Lee', 'Zara', "Levi's", 'H&M', 'Diesel', 'Wrangler', 'No brand', "Levi's", 'Lee', 'Zara', 'Tommy Hilfiger', "Levi's", 'Calvin Klein', 'Wrangler', 'H&M'];
+  for (let i = 0; i < brands.length + 2; i++)
+    await rpc('record_one_piece', {p_grade: ['A', 'A', 'B', 'A', 'C', 'B', 'A', 'Reject'][i % 8], p_brand: brands[i] || null});
+  say('Demo data loaded ✓');
+  location.hash = '#dashboard';
+  await refresh();
+}
+
+/* ---------- wiring ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  e.preventDefault();
+  if (b.disabled) return;
+  const done = () => { b.disabled = false; };
+  if (b.tagName === 'BUTTON') b.disabled = true;
+  Promise.resolve().then(() => ACT[b.dataset.act](b.dataset.id)).catch(err => toast(err.message)).finally(done);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('#modal').hidden) { $('#modal [data-close]')?.click(); return; }
+  if (route()[0] !== 'sorting' || !$('#modal').hidden || !S?.live.baleId || !$('.counters')) return;
+  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+  const g = {a: 'A', b: 'B', c: 'C', r: 'Reject'}[e.key.toLowerCase()];
+  if (g) { e.preventDefault(); ACT.piece(g).catch(err => toast(err.message)); }
+  else if (e.key.toLowerCase() === 'u') { e.preventDefault(); ACT.undo().catch(err => toast(err.message)); }
+});
+
+function render(keep) {
+  if (!S) return;
+  const [pg, arg] = route();
+  const p = PAGES[pg] ? pg : 'dashboard';
+  let saved = null, focusName = null;
+  const y = window.scrollY;
+  if (keep) {
+    saved = [...$('#app').querySelectorAll('input[name]:not([data-nokeep]),select[name]:not([data-nokeep])')].filter(e => e.type !== 'checkbox').map(e => [e.name, e.value]);
+    focusName = $('#app').contains(document.activeElement) ? document.activeElement.name : null;
+  }
+  drawNav();
+  $('#app').innerHTML = PAGES[p](arg);
+  if (saved) saved.forEach(([n, v]) => { const e = $('#app').querySelector(`[name="${CSS.escape(n)}"]:not([data-nokeep])`); if (e) e.value = v; });
+  AFTER[p] && AFTER[p](arg);
+  if (keep) { window.scrollTo(0, y); if (focusName) $('#app').querySelector(`[name="${CSS.escape(focusName)}"]`)?.focus(); }
+  else window.scrollTo(0, 0);
+  maybeBrandPopup();
+}
+window.addEventListener('hashchange', () => render());
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S) refresh(); });
+setInterval(() => { if (S && !document.hidden) refresh(); }, 60000);
+start();
+</script>
+</body>
+</html>
