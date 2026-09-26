@@ -586,13 +586,14 @@ function maybeBrandPopup() {
   const next = S.pending.find(p => p.id > brandSnooze);
   if (!next) return;
   if (!m.hidden && m.dataset.edit) return;
-  if (!m.hidden && brandShowing === next.id) { const w = m.querySelector('#waiting'); if (w) w.textContent = S.pending.length > 1 ? `${S.pending.length - 1} more waiting` : ''; return; }
+  if (!m.hidden && (brandShowing === next.id || typeof brandShowing === 'object' || S.pending.some(x => x.id === brandShowing))) { const w = m.querySelector('#waiting'); if (w) w.textContent = S.pending.length > 1 ? `${S.pending.length - 1} more waiting` : ''; return; }
   openBrand(next);
 }
 function openBrand(p, edit) {
-  brandShowing = p.id;
+  brandShowing = p.id ?? p;
   const quick = S.brands.filter(b => b.brand !== 'No brand').slice(0, 12);
-  const f = modal(edit ? `Change brand — piece #${p.id}` : `Which brand? — piece #${p.id}`, `
+  const no = `<span id="pieceNo">${p.id ?? '…'}</span>`;
+  const f = modal(edit ? `Change brand — piece #${no}` : `Which brand? — piece #${no}`, `
     <p class="bigpiece"><span class="g g-${p.grade}">${p.grade}</span> <b>${esc(p.category)}</b> · bale ${p.bale_id} · ${clock(p.created_at)}
       <span class="pill p-packed" id="waiting">${!edit && S.pending.length > 1 ? `${S.pending.length - 1} more waiting` : ''}</span></p>
     <div class="brandbtns">${quick.map(b => `<button type="button" class="btn ghost" data-brand="${esc(b.brand)}">${esc(b.brand)}</button>`).join('')}
@@ -602,11 +603,16 @@ function openBrand(p, edit) {
     async f => {
       const v = f.brand.value.trim();
       if (!v) return 'Type a brand, or press "No brand / skip"';
-      await q(tb('sorted_pieces').update({brand: v}).eq('id', p.id));
+      const id = p.id ?? await p.idPromise;
+      await q(tb('sorted_pieces').update({brand: v}).eq('id', id));
     }, 'Save brand', 'brand');
   $('#modal').dataset.edit = edit ? '1' : '';
   f.querySelectorAll('[data-brand]').forEach(b => b.onclick = () => { f.brand.value = b.dataset.brand; f.requestSubmit(); });
-  f.querySelector('[data-close]').addEventListener('click', () => { if (!edit) brandSnooze = Math.max(...S.pending.map(x => x.id)); });
+  f.querySelector('[data-close]').addEventListener('click', () => {
+    if (edit) return;
+    brandSnooze = Math.max(brandSnooze, p.id || 0, ...S.pending.map(x => x.id));
+    if (p.id == null && p.idPromise) p.idPromise.then(id => { brandSnooze = Math.max(brandSnooze, id); }).catch(() => {});
+  });
 }
 
 PAGES.inventory = cat => {
@@ -832,8 +838,21 @@ const ACT = {
     toast(`${id} is now live — sensor boxes count into it`); refresh();
   },
   async piece(grade) {
-    await rpc('record_one_piece', {p_grade: grade});
-    refresh();
+    // Show the count + brand popup instantly; the database save runs behind it.
+    beep();
+    const n = $(`.gbtn[data-id="${grade}"] b`);
+    if (n) n.textContent = num((+n.textContent.replace(/\D/g, '') || 0) + 1);
+    const p = {id: null, grade, category: S.live.category, bale_id: S.live.baleId, created_at: new Date().toISOString()};
+    p.idPromise = rpc('record_one_piece', {p_grade: grade});
+    if ($('#modal').hidden) openBrand(p);
+    try {
+      p.id = await p.idPromise;
+      lastPieceId = Math.max(lastPieceId || 0, p.id);
+      if (brandShowing === p) { brandShowing = p.id; const el = $('#pieceNo'); if (el) el.textContent = p.id; }
+    } catch (e) {
+      if (brandShowing === p) $('#modal').hidden = true;
+      throw e;
+    } finally { refresh(); }
   },
   async undo() {
     const r = await rpc('undo_last_piece', {});
