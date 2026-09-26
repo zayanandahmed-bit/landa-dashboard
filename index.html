@@ -241,7 +241,7 @@ async function loadAll() {
   S = {
     settings: {bizName: set.biz_name, alertEmail: set.alert_email, sortDays: set.sort_days, dispatchDays: set.dispatch_days,
       dueDays: set.due_days, runoutDays: set.runout_days, deadDays: set.dead_days, lockoutSeconds: set.sensor_lockout_seconds,
-      emailUrl: set.email_webapp_url || '', dailyDigest: set.email_daily_digest !== false, instantAlerts: set.email_instant_alerts !== false,
+      brandList: set.brand_list || [], brandsReady: 'brand_list' in set, emailUrl: set.email_webapp_url || '', dailyDigest: set.email_daily_digest !== false, instantAlerts: set.email_instant_alerts !== false,
       robotAt: set.email_robot_connected_at || null, emailReady: 'email_webapp_url' in set},
     categories: cats.map(c => c.name),
     stock: Object.fromEntries(stock.map(s => [s.category + '|' + s.grade, {qty: s.qty, price: +s.price, min: s.min_qty}])),
@@ -539,15 +539,32 @@ PAGES.sorting = id => {
     <div id="sortSum" class="muted"></div>
     <div class="btns"><label class="muted"><input type="checkbox" name="finish" data-nokeep checked> finish bale after adding</label><button class="btn" type="submit">Add to stock</button></div></div></form></details>`;
 };
+const brandList = () => {
+  const saved = S.settings.brandList;
+  return (S.settings.brandsReady ? saved : S.brands.map(x => x.brand).filter(x => x !== 'No brand')).slice().sort((a, b) => a.localeCompare(b));
+};
+const canonBrand = v => { const t = (v || '').trim(); return brandList().find(x => x.toLowerCase() === t.toLowerCase()) || t; };
+async function saveBrandList(list) {
+  const seen = new Set(), out = [];
+  list.map(x => x.trim()).filter(Boolean).forEach(x => { if (!seen.has(x.toLowerCase())) { seen.add(x.toLowerCase()); out.push(x); } });
+  out.sort((a, b) => a.localeCompare(b));
+  await q(tb('settings').update({brand_list: out, updated_at: new Date().toISOString()}).eq('id', 1));
+  S.settings.brandList = out;
+}
+async function rememberBrand(v) {
+  if (!S.settings.brandsReady || !v || v === 'No brand' || brandList().some(x => x.toLowerCase() === v.toLowerCase())) return;
+  await saveBrandList([...S.settings.brandList, v]);
+}
 function brandBar() {
   if (!S.live.brandReady) return '<div class="alert a-warn"><span class="dot"></span><span><b>Brand mode needs one database step</b>Run <code>supabase/004_brand_mode.sql</code> in the Supabase SQL editor, then refresh.</span></div>';
   const cur = S.live.brand;
-  const top = S.brands.filter(x => x.brand !== 'No brand').slice(0, 14);
+  const list = brandList();
   if (cur) return `<div class="brandmode on"><div><b>🏷 Brand mode: ${esc(cur)}</b><div class="muted">Every piece you count is tagged <b>${esc(cur)}</b> automatically — the popup only asks for the category.</div></div>
     <div class="btns"><button class="btn ghost sm" data-act="newBrandMode">Change brand</button><button class="btn red sm" data-act="brandModeOff">Turn off</button></div></div>`;
   return `<div class="brandmode"><div><b>🏷 Sorting one brand?</b> <span class="muted">Pick it once — no need to choose the brand for every piece.</span></div>
-    <div class="brandbtns" style="margin:8px 0 0">${top.map(x => `<button class="btn ghost sm" data-act="setBrandMode" data-id="${esc(x.brand)}">${esc(x.brand)}</button>`).join('')}
-    <button class="btn sm" data-act="newBrandMode">＋ Other brand…</button></div></div>`;
+    <div class="btns" style="margin-top:8px"><select id="modeBrand" data-nokeep style="padding:8px 10px;border:2px solid var(--brand);border-radius:8px;font:inherit;font-weight:600;min-width:220px">
+      <option value="">Pick a brand…</option>${list.map(x => `<option>${esc(x)}</option>`).join('')}</select>
+      <button class="btn ghost sm" data-act="newBrandMode">＋ New brand…</button>${list.length ? '' : ' <span class="muted">Add your brands in <a href="#settings">Settings</a> to pick them here.</span>'}</div></div>`;
 }
 function livePanel(b) {
   const y = b.yield, byGrade = g => sum(Object.entries(y).filter(([k]) => k.endsWith('|' + g)), e => e[1]);
@@ -567,6 +584,7 @@ function livePanel(b) {
   </table></div>`;
 }
 AFTER.sorting = id => {
+  $('#modeBrand')?.addEventListener('change', e => { if (e.target.value) ACT.setBrandMode(e.target.value).catch(err => toast(err.message)); });
   const d = $('#handCount'); if (d) d.addEventListener('toggle', () => handOpen = d.open);
   const f = $('#sortForm'); if (!f) return;
   const open = S.bales.filter(b => b.status !== 'sorted');
@@ -608,7 +626,7 @@ function openBrand(p, edit) {
   brandShowing = p.id ?? p;
   const mode = !edit && S.live.brand ? S.live.brand : null;   // brand mode: brand is already decided
   let cat = p.category || (mode ? '' : lastCat) || '';
-  const quick = S.brands.filter(b => b.brand !== 'No brand').slice(0, 12);
+  const quick = brandList().slice(0, 40);
   const no = `<span id="pieceNo">${p.id ?? '…'}</span>`;
   const catBtns = `<div class="brandbtns" id="catBtns">${S.categories.map(c => `<button type="button" class="btn ${mode ? 'big ' : ''}${c === cat ? '' : 'ghost'}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>`;
   const f = modal(mode ? `Piece #${no} — which category?` : `Piece #${no} — category & brand`, `
@@ -616,16 +634,17 @@ function openBrand(p, edit) {
       <span class="pill p-packed" id="waiting">${!edit && S.pending.length > 1 ? `${S.pending.length - 1} more waiting` : ''}</span></p>
     ${mode ? `<label style="margin:12px 0 0">Tap the category to save</label>${catBtns}` : `<label style="margin:12px 0 0">Category</label>${catBtns}
     <label style="margin:0">Brand <span style="font-weight:400">— tap one to save</span></label>
-    <div class="brandbtns">${quick.map(b => `<button type="button" class="btn ghost" data-brand="${esc(b.brand)}">${esc(b.brand)}</button>`).join('')}
+    <div class="brandbtns">${quick.map(b => `<button type="button" class="btn ghost" data-brand="${esc(b)}">${esc(b)}</button>`).join('')}
       <button type="button" class="btn ghost" data-brand="No brand" style="border-style:dashed">No brand / skip</button></div>
     <label>Or type a brand<input name="brand" list="brandlist" placeholder="Type a brand and press Enter" autocomplete="off" value="${esc(p.brand || '')}"></label>
-    <datalist id="brandlist">${S.brands.map(b => `<option value="${esc(b.brand)}">`).join('')}</datalist>`}`,
+    <datalist id="brandlist">${brandList().map(b => `<option value="${esc(b)}">`).join('')}</datalist>`}`,
     async f => {
       if (!cat) return 'Tap a category first';
-      const v = mode || f.brand.value.trim();
+      const v = mode || canonBrand(f.brand.value);
       if (!v) return 'Tap a brand, type one, or press "No brand / skip"';
       const id = p.id ?? await p.idPromise;
       await rpc('set_piece_details', {p_piece: id, p_category: cat, p_brand: v});
+      rememberBrand(v).catch(() => {});
       if (!mode) lastCat = cat;
     }, mode ? 'Save' : 'Save', 'brand');
   $('#modal').dataset.edit = edit ? '1' : '';
@@ -701,6 +720,7 @@ PAGES.settings = () => {
     ${f('dueDays', 'Payment overdue after (days)')}${f('runoutDays', '"Selling fast" when stock lasts less than (days)')}${f('deadDays', '"Not moving" if no sale in (days)')}
     ${f('lockoutSeconds', 'Sensor box lockout after each piece (seconds)')}
   </div><div style="margin-top:14px"><button class="btn">Save settings</button></div></form>
+  ${brandsCard()}
   ${emailCard()}
   <div class="card" style="margin-top:14px"><h2>Categories</h2><p class="muted">Every category gets grades ${GRADES.join(', ')}. Set prices & minimums on the Inventory page.</p>
     <p>${S.categories.map(c => `<span class="pill p-new" style="margin:0 4px 4px 0">${esc(c)}</span>`).join('')}</p>
@@ -713,6 +733,15 @@ PAGES.settings = () => {
     <button class="btn ghost" data-act="demo">Load demo data</button><button class="btn red" data-act="wipe">Wipe everything (fresh start)</button>
     <button class="btn ghost" data-act="logout">Log out of this device</button></div></div>`;
 };
+function brandsCard() {
+  if (!S.settings.brandsReady) return `<div class="card" style="margin-top:14px"><h2>🏷 Brands</h2><p class="low">One more database step: run <code>supabase/005_brand_list.sql</code> in the Supabase SQL editor, then refresh.</p></div>`;
+  const list = brandList();
+  return `<div class="card" style="margin-top:14px"><h2>🏷 Brands</h2>
+    <p class="muted">Add your brands here once. On the Sorting screen you then pick them from a dropdown (and tap them in the popup) instead of typing. Spelling and capitals are kept exactly as you save them here.</p>
+    <p>${list.map(b => `<span class="pill p-new" style="margin:0 6px 6px 0;font-size:13px;padding:3px 6px 3px 12px">${esc(b)} <a href="#" data-act="removeBrand" data-id="${esc(b)}" title="Remove" style="color:var(--danger);text-decoration:none;font-weight:700;margin-left:4px">×</a></span>`).join('') || '<span class="muted">No brands yet.</span>'}</p>
+    <form id="brandForm" class="btns"><input name="b" data-nokeep placeholder="e.g. Levi's, Zara, H&M, Nike" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;min-width:280px"><button class="btn">Add brand(s)</button></form>
+    <p class="muted" style="margin:6px 0 0">Tip: add several at once by separating them with commas.</p></div>`;
+}
 function emailCard() {
   const s = S.settings;
   if (!s.emailReady) return `<div class="card" style="margin-top:14px"><h2>📧 Email alerts</h2><p class="low">One more database step: run <code>supabase/002_email_alerts.sql</code> in the Supabase SQL editor, then refresh.</p></div>`;
@@ -751,6 +780,12 @@ async function mailer(action, extra = {}) {
   return d;
 }
 AFTER.settings = () => {
+  $('#brandForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const add = e.target.b.value.split(/[,\n]+/).map(x => x.trim()).filter(Boolean);
+    if (!add.length) return;
+    try { await saveBrandList([...S.settings.brandList, ...add]); e.target.reset(); toast(`Saved ${add.length} brand${add.length > 1 ? 's' : ''}`); render(true); } catch (err) { toast(err.message); }
+  });
   $('#mailForm')?.addEventListener('submit', async e => {
     e.preventDefault();
     try { await saveMail(); toast('Email settings saved'); refresh(); } catch (err) { toast(err.message); }
@@ -861,7 +896,12 @@ const ACT = {
       <label>Credit limit (Rs, 0 = none)<input type="number" name="limit" min="0" value="${c.limit || 0}"></label>`,
       async f => { await rpc('save_customer', {p_id: id || null, p_name: f.name.value, p_city: f.city.value, p_phone: f.phone.value.replace(/\D/g, ''), p_limit: +f.limit.value || 0}); });
   },
+  async removeBrand(b) {
+    if (!confirm(`Remove ${b} from the list? Pieces already tagged ${b} keep their brand.`)) return;
+    await saveBrandList(S.settings.brandList.filter(x => x !== b)); render(true);
+  },
   async setBrandMode(brand) {
+    brand = canonBrand(brand); rememberBrand(brand).catch(() => {});
     await q(tb('live_sorting_session').update({brand, updated_at: new Date().toISOString()}).eq('id', 1));
     S.live.brand = brand; toast(`Brand mode ON — every piece is tagged ${brand}`); refresh();
   },
