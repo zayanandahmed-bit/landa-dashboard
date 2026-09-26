@@ -27,6 +27,25 @@ Business dashboard for a landa clothing wholesale business. It covers the whole 
    ```
 3. Open the site and unlock it.
 
+## Email alerts
+
+Emails are sent **from your own Gmail** by a small Google Apps Script (`email-robot/Code.gs`), so no email password is stored anywhere.
+
+1. Run `supabase/002_email_alerts.sql` in the Supabase SQL editor. Fresh installs already have it in `setup.sql`.
+2. Sign in to Google as **zayantechtricks@gmail.com** and open https://script.google.com. Click **New project** and name it "Landa email robot".
+3. Delete what's in `Code.gs` and paste in `email-robot/Code.gs` from this repo. Save.
+4. Pick `setup` in the function dropdown and press **Run**. Allow the permissions it asks for (sending email, and connecting to external services and triggers).
+5. Click **Deploy → New deployment**, choose the type **Web app**, and set:
+   - **Execute as:** Me
+   - **Who has access:** Anyone
+
+   Click **Deploy** and copy the web app URL, which ends in `/exec`.
+6. In the dashboard, go to **Settings → Email alerts**, paste the URL and the addresses to send to, then:
+   - **Send test email**: checks that sending works.
+   - **Connect email robot**: turns on the 9 AM daily digest and the hourly urgent-alert emails.
+
+If you change `Code.gs` later, go to **Deploy → Manage deployments → Edit → Version: New version**. That keeps the same URL.
+
 ## Sensor boxes (ESP32)
 
 Create a box under **Settings → Sensor boxes** to get a device ID and secret key. The box then calls these two functions:

@@ -236,7 +236,9 @@ async function loadAll() {
   const byBale = {}, byOrder = {};
   S = {
     settings: {bizName: set.biz_name, alertEmail: set.alert_email, sortDays: set.sort_days, dispatchDays: set.dispatch_days,
-      dueDays: set.due_days, runoutDays: set.runout_days, deadDays: set.dead_days, lockoutSeconds: set.sensor_lockout_seconds},
+      dueDays: set.due_days, runoutDays: set.runout_days, deadDays: set.dead_days, lockoutSeconds: set.sensor_lockout_seconds,
+      emailUrl: set.email_webapp_url || '', dailyDigest: set.email_daily_digest !== false, instantAlerts: set.email_instant_alerts !== false,
+      robotAt: set.email_robot_connected_at || null, emailReady: 'email_webapp_url' in set},
     categories: cats.map(c => c.name),
     stock: Object.fromEntries(stock.map(s => [s.category + '|' + s.grade, {qty: s.qty, price: +s.price, min: s.min_qty}])),
     bales: bales.map(b => byBale[b.id] = {id: b.id, date: b.received_date, supplier: b.supplier, type: b.bale_type,
@@ -660,11 +662,12 @@ PAGES.settings = () => {
   const f = (k, t, type = 'number') => `<label>${t}<input type="${type}" name="${k}" value="${esc(s[k])}"></label>`;
   return head('Settings', 'Alert rules, categories, sensor boxes and your data') + `
   <form class="card" id="setForm"><h2>Business & alert rules</h2><div class="set">
-    ${f('bizName', 'Business name', 'text')}${f('alertEmail', 'Send alert emails to', 'email')}
+    ${f('bizName', 'Business name', 'text')}
     ${f('sortDays', 'Warn if a bale is unsorted after (days)')}${f('dispatchDays', 'Warn if an order is not dispatched after (days)')}
     ${f('dueDays', 'Payment overdue after (days)')}${f('runoutDays', '"Selling fast" when stock lasts less than (days)')}${f('deadDays', '"Not moving" if no sale in (days)')}
     ${f('lockoutSeconds', 'Sensor box lockout after each piece (seconds)')}
   </div><div style="margin-top:14px"><button class="btn">Save settings</button></div></form>
+  ${emailCard()}
   <div class="card" style="margin-top:14px"><h2>Categories</h2><p class="muted">Every category gets grades ${GRADES.join(', ')}. Set prices & minimums on the Inventory page.</p>
     <p>${S.categories.map(c => `<span class="pill p-new" style="margin:0 4px 4px 0">${esc(c)}</span>`).join('')}</p>
     <form id="catForm" class="btns"><input name="c" data-nokeep placeholder="e.g. Bedsheets" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font:inherit"><button class="btn">Add category</button></form></div>
@@ -676,12 +679,53 @@ PAGES.settings = () => {
     <button class="btn ghost" data-act="demo">Load demo data</button><button class="btn red" data-act="wipe">Wipe everything (fresh start)</button>
     <button class="btn ghost" data-act="logout">Log out of this device</button></div></div>`;
 };
+function emailCard() {
+  const s = S.settings;
+  if (!s.emailReady) return `<div class="card" style="margin-top:14px"><h2>📧 Email alerts</h2><p class="low">One more database step: run <code>supabase/002_email_alerts.sql</code> in the Supabase SQL editor, then refresh.</p></div>`;
+  return `<form class="card" id="mailForm" style="margin-top:14px"><h2>📧 Email alerts</h2>
+    <p class="muted">Emails are sent <b>from your Gmail</b> (zayantechtricks@gmail.com) by the email robot, a small Google Apps Script in your account. Set it up once, following README → “Email alerts”.</p>
+    <div class="set">
+      <label>Send alert emails to <span style="font-weight:400">(separate several with commas)</span><input type="text" name="alertEmail" value="${esc(s.alertEmail)}" placeholder="you@gmail.com, partner@gmail.com"></label>
+      <label>Email robot URL <span style="font-weight:400">(from Apps Script → Deploy)</span><input type="url" name="emailUrl" value="${esc(s.emailUrl)}" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    </div>
+    <div class="btns" style="margin:12px 0">
+      <label class="muted"><input type="checkbox" name="dailyDigest" ${s.dailyDigest ? 'checked' : ''}> Daily digest at 9 AM</label>
+      <label class="muted" style="margin-left:14px"><input type="checkbox" name="instantAlerts" ${s.instantAlerts ? 'checked' : ''}> Email straight away when a new 🔴 urgent alert appears (checked hourly)</label>
+    </div>
+    <p class="muted" style="margin:0 0 12px">Automatic emails: ${s.robotAt ? `<span class="up">● connected ${since(s.robotAt)}</span>` : '<span class="low">not connected yet — press “Connect email robot”</span>'}</p>
+    <div class="btns"><button class="btn">Save</button>
+      <button class="btn ghost" type="button" data-act="testEmail">✉️ Send test email</button>
+      <button class="btn ghost" type="button" data-act="emailDigest">Send digest now</button>
+      <button class="btn ghost" type="button" data-act="connectEmail">🔗 Connect email robot</button></div></form>`;
+}
+async function saveMail() {
+  const f = $('#mailForm');
+  if (!f) return;
+  await q(tb('settings').update({alert_email: f.alertEmail.value.trim(), email_webapp_url: f.emailUrl.value.trim(),
+    email_daily_digest: f.dailyDigest.checked, email_instant_alerts: f.instantAlerts.checked, updated_at: new Date().toISOString()}).eq('id', 1));
+  Object.assign(S.settings, {alertEmail: f.alertEmail.value.trim(), emailUrl: f.emailUrl.value.trim(), dailyDigest: f.dailyDigest.checked, instantAlerts: f.instantAlerts.checked});
+}
+async function mailer(action, extra = {}) {
+  await saveMail();
+  const url = S.settings.emailUrl;
+  if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) throw new Error('Paste the email robot URL (https://script.google.com/…/exec) in Settings → Email alerts first');
+  if (!S.settings.alertEmail) throw new Error('Add at least one email address to send to');
+  let d;
+  try { d = await (await fetch(url, {method: 'POST', body: JSON.stringify({action, token, ...extra})})).json(); }
+  catch (e) { throw new Error('Could not reach the email robot — check the URL and that it is deployed with access "Anyone"'); }
+  if (!d.ok) throw new Error(d.error || 'Email failed');
+  return d;
+}
 AFTER.settings = () => {
+  $('#mailForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    try { await saveMail(); toast('Email settings saved'); refresh(); } catch (err) { toast(err.message); }
+  });
   $('#setForm').addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target, n = k => Math.max(0, +f[k].value || 0);
     try {
-      await q(tb('settings').update({biz_name: f.bizName.value.trim() || 'My Landa Business', alert_email: f.alertEmail.value.trim(), sort_days: n('sortDays'), dispatch_days: n('dispatchDays'),
+      await q(tb('settings').update({biz_name: f.bizName.value.trim() || 'My Landa Business', sort_days: n('sortDays'), dispatch_days: n('dispatchDays'),
         due_days: n('dueDays'), runout_days: n('runoutDays'), dead_days: n('deadDays'), sensor_lockout_seconds: n('lockoutSeconds'), updated_at: new Date().toISOString()}).eq('id', 1));
       toast('Settings saved'); refresh();
     } catch (err) { toast(err.message); }
@@ -823,9 +867,25 @@ const ACT = {
     const msg = `Assalam o Alaikum ${c.name},\nFriendly reminder of your pending balance with ${S.settings.bizName}:\n${os.map(o => `• ${o.id} (${o.date}): ${rs(due(o))}`).join('\n')}\nTotal: ${rs(custDue(id))}\nJazakAllah.`;
     window.open(`https://wa.me/${c.phone}?text=${encodeURIComponent(msg)}`, '_blank');
   },
-  emailDigest() {
+  async testEmail() {
+    toast('Sending test email…', 20000);
+    const d = await mailer('test');
+    toast(`✅ Test email sent from ${d.from} to ${d.sentTo.join(', ')} — check the inbox (and spam)`, 7000);
+  },
+  async connectEmail() {
+    toast('Connecting email robot…', 20000);
+    const robotToken = await rpc('create_email_robot_session');
+    const d = await mailer('connect', {robotToken});
+    toast('✅ ' + d.message, 6000); refresh();
+  },
+  async emailDigest() {
+    if (S.settings.emailUrl) {
+      toast('Sending digest…', 20000);
+      const d = await mailer('digest');
+      return toast(`✅ Digest emailed to ${d.sentTo.join(', ')}`, 6000);
+    }
     const to = S.settings.alertEmail;
-    if (!to) { toast('Set an alert email in Settings first'); location.hash = '#settings'; return; }
+    if (!to) { toast('Set up email alerts in Settings first'); location.hash = '#settings'; return; }
     const A = alerts(), bs = bestSeller(30);
     const body = `${S.settings.bizName} — daily digest ${today()}\n\n${A.map(a => `[${a.type}] ${a.text}`).join('\n') || 'All clear.'}\n\nBest seller (30 days): ${bs ? `${label(bs.key)} — ${bs.pcs} pcs` : '—'}\nStock: ${num(sum(Object.values(S.stock), s => s.qty))} pcs · To collect: ${rs(sum(S.orders, due))}`;
     location.href = `mailto:${to}?subject=${encodeURIComponent(`${S.settings.bizName}: ${A.length} alerts (${today()})`)}&body=${encodeURIComponent(body)}`;
