@@ -523,7 +523,8 @@ PAGES.bales = () => head('Bales in', 'Every landa bale you buy — log it the da
     return `<tr><td>${b.id}</td><td>${b.date}</td><td>${esc(b.supplier)}</td><td>${esc(b.type)}</td><td class="n">${num(b.weightKg)}</td><td class="n">${rs(b.cost)}</td><td class="n">${num(b.cost / b.weightKg)}</td>
     <td>${b.status === 'sorting' && S.live.baleId !== b.id ? '<span class="pill p-received">⏸ Paused</span>' : pill(b.status)}${b.status !== 'sorted' && age(b.date) >= S.settings.sortDays ? ` <span class="low">${age(b.date)}d</span>` : ''}</td>
     <td class="n">${p ? num(p) : '—'}</td><td class="n">${p ? Math.round(a / p * 100) + '%' : '—'}</td>
-    <td>${b.status !== 'sorted' ? `<a class="btn sm" href="#sorting/${b.id}">${b.status === 'sorting' ? (S.live.baleId === b.id ? 'Open' : 'Resume') : 'Sort now'}</a>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="11" class="empty">No bales yet — add your first one.</td></tr>'}
+    <td><div class="btns">${b.status !== 'sorted' ? `<a class="btn sm" href="#sorting/${b.id}">${b.status === 'sorting' ? (S.live.baleId === b.id ? 'Open' : 'Resume') : 'Sort now'}</a>` : ''}
+      <button class="btn ghost sm" data-act="editBale" data-id="${b.id}">Edit</button><button class="btn red sm" data-act="deleteBale" data-id="${b.id}">Delete</button></div></td></tr>`; }).join('') || '<tr><td colspan="11" class="empty">No bales yet — add your first one.</td></tr>'}
   </table></div>`;
 
 let handOpen = false;
@@ -539,7 +540,8 @@ PAGES.sorting = id => {
     <div class="head"><div><h2>${b.id} — ${esc(b.type)} from ${esc(b.supplier)}</h2>
       <p class="muted" style="margin:-6px 0 0">${b.weightKg} kg · ${rs(b.cost)} · <b>${num(tot)} pcs so far</b>${tot ? ` · ${(tot / b.weightKg).toFixed(1)} pcs/kg · ${rs(b.cost / tot)}/pc` : ''}</p></div>
       <div class="btns">${isLive ? '<span class="pill p-delivered">● LIVE — sensor boxes count into this bale</span><button class="btn ghost" data-act="pauseBale">⏸ Pause bale</button>' : `${tot ? '<span class="pill p-received">⏸ Paused — nothing is being counted</span>' : ''}<button class="btn" data-act="goLive" data-id="${b.id}">${tot ? '▶ Resume this bale' : '▶ Start sorting this bale'}</button>`}
-      <button class="btn ghost" data-act="finishBale" data-id="${b.id}">✓ Finish bale</button></div></div>
+      <button class="btn ghost" data-act="finishBale" data-id="${b.id}">✓ Finish bale</button>
+      <button class="btn ghost" data-act="editBale" data-id="${b.id}">✎ Edit bale</button><button class="btn red" data-act="deleteBale" data-id="${b.id}">🗑 Delete bale</button></div></div>
     ${isLive ? livePanel(b) : `<p class="muted">Start or resume this bale to count with the sensor boxes or the A / B / C buttons.${S.live.baleId ? ` Right now <b>${S.live.baleId}</b> is live.` : ''}</p>`}
   </div>
   <details class="card" style="margin-top:14px" id="handCount" ${handOpen || !isLive ? 'open' : ''}><summary><b>Count by hand instead</b> <span class="muted">— type the size of each pile</span></summary>
@@ -591,7 +593,7 @@ function livePanel(b) {
   ${S.recent.map((p, i) => `<tr class="${i === 0 ? 'flash' : ''}"><td class="muted">${p.id}</td><td>${clock(p.created_at)}</td><td><span class="g g-${p.grade}">${p.grade}</span></td>
     <td>${p.category ? esc(p.category) : '<span class="low">—</span>'}</td><td>${p.brand ? esc(p.brand) : '<span class="low">—</span>'}</td>
     <td class="muted">${p.source === 'sensor' ? '📡 sensor' : '👆 button'}</td>
-    <td><button class="btn ${p.category && p.brand ? 'ghost ' : ''}sm" data-act="editBrand" data-id="${p.id}">${p.category && p.brand ? 'Change' : 'Add details'}</button></td></tr>`).join('') || '<tr><td colspan="7" class="empty">No pieces yet — throw the first one in!</td></tr>'}
+    <td><div class="btns"><button class="btn ${p.category && p.brand ? 'ghost ' : ''}sm" data-act="editBrand" data-id="${p.id}">${p.category && p.brand ? 'Edit' : 'Add details'}</button><button class="btn red sm" data-act="deletePiece" data-id="${p.id}" title="Delete this piece">✕</button></div></td></tr>`).join('') || '<tr><td colspan="7" class="empty">No pieces yet — throw the first one in!</td></tr>'}
   </table></div>`;
 }
 AFTER.sorting = id => {
@@ -636,13 +638,14 @@ let lastCat = null;
 function openBrand(p, edit) {
   brandShowing = p.id ?? p;
   const mode = !edit && S.live.brand ? S.live.brand : null;   // brand mode: brand is already decided
-  let cat = p.category || (mode ? '' : lastCat) || '';
+  let cat = p.category || (mode ? '' : lastCat) || '', grade = p.grade;
   const quick = brandList().slice(0, 40);
   const no = `<span id="pieceNo">${p.id ?? '…'}</span>`;
   const catBtns = `<div class="brandbtns" id="catBtns">${S.categories.map(c => `<button type="button" class="btn ${mode ? 'big ' : ''}${c === cat ? '' : 'ghost'}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>`;
   const f = modal(mode ? `Piece #${no} — which category?` : `Piece #${no} — category & brand`, `
     <p class="bigpiece"><span class="g g-${p.grade}">${p.grade}</span> ${mode ? `<span class="pill p-delivered">🏷 ${esc(mode)}</span>` : ''} bale ${p.bale_id} · ${clock(p.created_at)}
       <span class="pill p-packed" id="waiting">${!edit && S.pending.length > 1 ? `${S.pending.length - 1} more waiting` : ''}</span></p>
+    ${edit ? `<label style="margin:12px 0 0">Grade</label><div class="brandbtns" id="gradeBtns">${GRADES.map(g => `<button type="button" class="btn ${g === grade ? '' : 'ghost'}" data-grade="${g}">${g}</button>`).join('')}</div>` : ''}
     ${mode ? `<label style="margin:12px 0 0">Tap the category to save</label>${catBtns}` : `<label style="margin:12px 0 0">Category</label>${catBtns}
     <label style="margin:0">Brand <span style="font-weight:400">— tap one to save</span></label>
     <div class="brandbtns">${quick.map(b => `<button type="button" class="btn ghost" data-brand="${esc(b)}">${esc(b)}</button>`).join('')}
@@ -654,7 +657,8 @@ function openBrand(p, edit) {
       const v = mode || canonBrand(f.brand.value);
       if (!v) return 'Tap a brand, type one, or press "No brand / skip"';
       const id = p.id ?? await p.idPromise;
-      await rpc('set_piece_details', {p_piece: id, p_category: cat, p_brand: v});
+      if (edit) await rpc('update_piece', {p_piece: id, p_category: cat, p_grade: grade, p_brand: v});
+      else await rpc('set_piece_details', {p_piece: id, p_category: cat, p_brand: v});
       rememberBrand(v).catch(() => {});
       if (!mode) lastCat = cat;
     }, mode ? 'Save' : 'Save', 'brand');
@@ -665,7 +669,12 @@ function openBrand(p, edit) {
     f.querySelector('.err').textContent = '';
     if (mode) f.requestSubmit();          // brand mode: one tap = done
   });
+  f.querySelectorAll('[data-grade]').forEach(b => b.onclick = () => { grade = b.dataset.grade; f.querySelectorAll('[data-grade]').forEach(x => x.classList.toggle('ghost', x !== b)); });
   f.querySelectorAll('[data-brand]').forEach(b => b.onclick = () => { f.brand.value = b.dataset.brand; f.requestSubmit(); });
+  if (edit && p.id != null) f.querySelector('.foot .btns').insertAdjacentHTML('afterbegin', '<button type="button" class="btn red" id="delPiece">Delete piece</button>'), f.querySelector('#delPiece').onclick = async () => {
+    if (!confirm(`Delete piece #${p.id}? It comes out of stock.`)) return;
+    try { await rpc('delete_piece', {p_piece: p.id}); $('#modal').hidden = true; toast(`Piece #${p.id} deleted`); refresh(); } catch (e) { f.querySelector('.err').textContent = e.message; }
+  };
   f.querySelector('[data-close]').addEventListener('click', () => {
     if (edit) return;
     brandSnooze = Math.max(brandSnooze, p.id || 0, ...S.pending.map(x => x.id));
@@ -702,7 +711,8 @@ PAGES.orders = filter => {
       ${d > 0 ? `<button class="btn ghost sm" data-act="pay" data-id="${o.id}">+ Payment</button>` : ''}
       <button class="btn ghost sm" data-act="slip" data-id="${o.id}">Slip</button>
       ${o.status === 'dispatched' || o.status === 'packed' ? `<button class="btn ghost sm" data-act="wa" data-id="${o.id}">WhatsApp</button>` : ''}
-      ${o.status === 'new' || o.status === 'packed' ? `<button class="btn red sm" data-act="cancel" data-id="${o.id}">Cancel</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="10" class="empty">No orders here.</td></tr>'}
+      ${o.status === 'new' || o.status === 'packed' ? `<button class="btn red sm" data-act="cancel" data-id="${o.id}">Cancel</button>` : ''}
+      <button class="btn ghost sm" data-act="newOrder" data-id="${o.id}">Edit</button><button class="btn red sm" data-act="deleteOrder" data-id="${o.id}">Delete</button></div></td></tr>`; }).join('') || '<tr><td colspan="10" class="empty">No orders here.</td></tr>'}
   </table></div>`;
 };
 
@@ -711,7 +721,7 @@ PAGES.customers = () => head('Wholesalers', 'Who buys from you, how much, and wh
   ${S.customers.map(c => { const os = S.orders.filter(o => o.customerId === c.id && live(o)), d = custDue(c.id);
     return `<tr><td>${esc(c.name)}</td><td>${esc(c.city)}</td><td>${esc(c.phone)}</td><td class="n">${os.length}</td><td class="n">${rs(sum(os, total))}</td>
     <td class="n ${c.limit && d > c.limit ? 'low' : ''}">${rs(d)}</td><td class="n muted">${c.limit ? rs(c.limit) : '—'}</td><td>${os[0] ? os[0].date + ` <span class="muted">(${age(os[0].date)}d)</span>` : '—'}</td>
-    <td><div class="btns"><button class="btn ghost sm" data-act="editCust" data-id="${c.id}">Edit</button>${d > 0 ? `<button class="btn ghost sm" data-act="remind" data-id="${c.id}">Payment reminder</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="9" class="empty">No wholesalers yet.</td></tr>'}
+    <td><div class="btns"><button class="btn ghost sm" data-act="editCust" data-id="${c.id}">Edit</button><button class="btn red sm" data-act="deleteCust" data-id="${c.id}">Delete</button>${d > 0 ? `<button class="btn ghost sm" data-act="remind" data-id="${c.id}">Payment reminder</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="9" class="empty">No wholesalers yet.</td></tr>'}
   </table></div>`;
 
 PAGES.alerts = () => {
@@ -735,10 +745,10 @@ PAGES.settings = () => {
   ${emailCard()}
   ${aiCard()}
   <div class="card" style="margin-top:14px"><h2>Categories</h2><p class="muted">Every category gets grades ${GRADES.join(', ')}. Set prices & minimums on the Inventory page.</p>
-    <p>${S.categories.map(c => `<span class="pill p-new" style="margin:0 4px 4px 0">${esc(c)}</span>`).join('')}</p>
+    <p>${S.categories.map(c => `<span class="pill p-new" style="margin:0 6px 6px 0;font-size:13px;padding:3px 8px 3px 12px">${esc(c)} <a href="#" data-act="renameCat" data-id="${esc(c)}" title="Rename" style="text-decoration:none;margin-left:4px">✎</a><a href="#" data-act="deleteCat" data-id="${esc(c)}" title="Delete" style="color:var(--danger);text-decoration:none;font-weight:700;margin-left:6px">×</a></span>`).join('')}</p>
     <form id="catForm" class="btns"><input name="c" data-nokeep placeholder="e.g. Bedsheets" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font:inherit"><button class="btn">Add category</button></form></div>
   <div class="card" style="margin-top:14px"><h2>Sensor boxes</h2><p class="muted">Each ESP32 control box needs its own ID and secret key.</p>
-    ${S.devices.length ? `<table><tr><th>ID</th><th>Name</th><th>Last count</th></tr>${S.devices.map(d => `<tr><td>${d.id}</td><td>${esc(d.name)}</td><td class="muted">${d.last_seen ? since(d.last_seen) : 'never'}</td></tr>`).join('')}</table>` : ''}
+    ${S.devices.length ? `<table><tr><th>ID</th><th>Name</th><th>Last count</th><th></th></tr>${S.devices.map(d => `<tr><td>${d.id}</td><td>${esc(d.name)}</td><td class="muted">${d.last_seen ? since(d.last_seen) : 'never'}</td><td><div class="btns"><button class="btn ghost sm" data-act="renameDevice" data-id="${d.id}">Rename</button><button class="btn red sm" data-act="deleteDevice" data-id="${d.id}">Delete</button></div></td></tr>`).join('')}</table>` : ''}
     <div style="margin-top:10px"><button class="btn ghost" data-act="newDevice">+ Add sensor box</button></div></div>
   <div class="card" style="margin-top:14px"><h2>Your data</h2><p class="muted">Everything is saved in the online database and synced live to every logged-in screen.</p>
     <div class="btns"><button class="btn ghost" data-act="backup">Download backup</button>
@@ -842,7 +852,7 @@ function brandsCard() {
   const list = brandList();
   return `<div class="card" style="margin-top:14px"><h2>🏷 Brands</h2>
     <p class="muted">Add your brands here once. On the Sorting screen you then pick them from a dropdown (and tap them in the popup) instead of typing. Spelling and capitals are kept exactly as you save them here.</p>
-    <p>${list.map(b => `<span class="pill p-new" style="margin:0 6px 6px 0;font-size:13px;padding:3px 6px 3px 12px">${esc(b)} <a href="#" data-act="removeBrand" data-id="${esc(b)}" title="Remove" style="color:var(--danger);text-decoration:none;font-weight:700;margin-left:4px">×</a></span>`).join('') || '<span class="muted">No brands yet.</span>'}</p>
+    <p>${list.map(b => `<span class="pill p-new" style="margin:0 6px 6px 0;font-size:13px;padding:3px 6px 3px 12px">${esc(b)} <a href="#" data-act="renameBrand" data-id="${esc(b)}" title="Rename" style="text-decoration:none;margin-left:4px">✎</a><a href="#" data-act="removeBrand" data-id="${esc(b)}" title="Remove" style="color:var(--danger);text-decoration:none;font-weight:700;margin-left:4px">×</a></span>`).join('') || '<span class="muted">No brands yet.</span>'}</p>
     <form id="brandForm" class="btns"><input name="b" data-nokeep placeholder="e.g. Levi's, Zara, H&M, Nike" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;min-width:280px"><button class="btn">Add brand(s)</button></form>
     <p class="muted" style="margin:6px 0 0">Tip: add several at once by separating them with commas.</p></div>`;
 }
@@ -956,31 +966,43 @@ const ACT = {
       <label>Alert me when stock falls to (pcs)<input type="number" name="min" min="0" value="${s.min}"></label>`,
       f => rpc('update_stock_item', {p_category: category, p_grade: grade, p_qty: Math.round(+f.qty.value), p_price: +f.price.value, p_min: Math.round(+f.min.value)}).then(() => null));
   },
-  newOrder() {
+  newOrder(editId) {
+    const eo = editId ? S.orders.find(x => x.id === editId) : null;
     if (!S.customers.length) { toast('Add a wholesaler first'); location.hash = '#customers'; return; }
-    const opts = Object.entries(S.stock).filter(([, v]) => v.qty > 0).map(([k, v]) => `<option value="${esc(k)}">${esc(label(k))} — ${num(v.qty)} left</option>`).join('');
-    if (!opts) { toast('Nothing in stock to sell yet'); return; }
-    const row = () => `<div class="line"><select name="key">${opts}</select><input name="qty" type="number" min="1" placeholder="Qty"><input name="price" type="number" min="0" placeholder="Rs/pc"><button type="button" class="x">×</button></div>`;
-    const f = modal('New order', `<div class="row"><label>Wholesaler<select name="cust">${S.customers.map(c => `<option value="${c.id}">${esc(c.name)} — ${esc(c.city)}</option>`).join('')}</select></label>
-      <label>Date<input type="date" name="date" value="${today()}"></label></div>
-      <label>Items <span class="muted" style="font-weight:400">(item · qty · price per piece)</span></label><div id="lines">${row()}</div>
+    const own = {};
+    if (eo && eo.status !== 'cancelled') eo.lines.forEach(l => own[l.key] = (own[l.key] || 0) + l.qty);
+    const avail = k => ST(k).qty + (own[k] || 0);
+    const keys = Object.keys(S.stock).filter(k => avail(k) > 0 || (eo && eo.lines.some(l => l.key === k)));
+    if (!keys.length) { toast('Nothing in stock to sell yet'); return; }
+    const optsFor = sel => keys.map(k => `<option value="${esc(k)}" ${k === sel ? 'selected' : ''}>${esc(label(k))} — ${num(avail(k))} available</option>`).join('');
+    const row = (l = {}) => `<div class="line"><select name="key">${optsFor(l.key)}</select><input name="qty" type="number" min="1" placeholder="Qty" value="${l.qty ?? ''}"><input name="price" type="number" min="0" placeholder="Rs/pc" value="${l.price ?? ''}"><button type="button" class="x">×</button></div>`;
+    const couriers = eo && eo.courier && !COURIERS.includes(eo.courier) ? [...COURIERS, eo.courier] : COURIERS;
+    const f = modal(eo ? `Edit order ${eo.id}` : 'New order', `<div class="row"><label>Wholesaler<select name="cust">${S.customers.map(c => `<option value="${c.id}" ${eo && eo.customerId === c.id ? 'selected' : ''}>${esc(c.name)} — ${esc(c.city)}</option>`).join('')}</select></label>
+      <label>Date<input type="date" name="date" value="${eo ? eo.date : today()}"></label></div>
+      <label>Items <span class="muted" style="font-weight:400">(item · qty · price per piece)</span></label><div id="lines">${eo ? eo.lines.map(row).join('') : row()}</div>
       <button type="button" class="btn ghost sm" id="addLine">+ Add item</button>
-      <div class="row" style="margin-top:12px"><label>Advance received (Rs)<input type="number" name="paid" value="0" min="0"></label><label>Order total<input id="ot" disabled></label></div>
+      ${eo ? `<div class="row" style="margin-top:12px"><label>Courier<select name="courier"><option value="">—</option>${couriers.map(c => `<option ${c === eo.courier ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label><label>Tracking / bilty no.<input name="tracking" value="${esc(eo.tracking || '')}"></label></div>` : ''}
+      <div class="row" style="margin-top:12px"><label>${eo ? 'Paid so far (Rs)' : 'Advance received (Rs)'}<input type="number" name="paid" value="${eo ? eo.paid : 0}" min="0"></label><label>Order total<input id="ot" disabled></label></div>
       <div id="credit" class="err"></div>`,
       async f => {
         const lines = [...f.querySelectorAll('.line')].map(r => { const [category, grade] = r.querySelector('[name=key]').value.split('|'); return {category, grade, qty: Math.floor(+r.querySelector('[name=qty]').value), price: +r.querySelector('[name=price]').value}; });
         if (!lines.length || lines.some(l => !(l.qty > 0))) return 'Every item needs a quantity';
-        const id = await rpc('create_order', {p_customer: f.cust.value, p_date: f.date.value, p_lines: lines, p_paid: +f.paid.value || 0});
-        toast(`${id} created — stock reserved`);
-      }, 'Create order');
+        if (eo) {
+          await rpc('update_order', {p_order: eo.id, p_customer: f.cust.value, p_date: f.date.value, p_courier: f.courier.value, p_tracking: f.tracking.value, p_paid: +f.paid.value || 0, p_lines: lines});
+          toast(`${eo.id} updated — stock adjusted`);
+        } else {
+          const id = await rpc('create_order', {p_customer: f.cust.value, p_date: f.date.value, p_lines: lines, p_paid: +f.paid.value || 0});
+          toast(`${id} created — stock reserved`);
+        }
+      }, eo ? 'Save changes' : 'Create order');
     const setPrice = r => { r.querySelector('[name=price]').value = ST(r.querySelector('[name=key]').value).price; };
     const upd = () => {
       const t = sum([...f.querySelectorAll('.line')], r => +r.querySelector('[name=qty]').value * +r.querySelector('[name=price]').value);
       f.querySelector('#ot').value = rs(t);
-      const c = S.customers.find(x => x.id === f.cust.value), d = custDue(c.id);
+      const c = S.customers.find(x => x.id === f.cust.value), d = custDue(c.id) - (eo && eo.customerId === c.id ? due(eo) : 0);
       f.querySelector('#credit').textContent = c.limit && d + t - (+f.paid.value || 0) > c.limit ? `⚠ ${c.name} already owes ${rs(d)} — this order takes them over their ${rs(c.limit)} limit` : '';
     };
-    f.querySelectorAll('.line').forEach(setPrice);
+    f.querySelectorAll('.line').forEach(r => { if (!r.querySelector('[name=price]').value) setPrice(r); });
     f.querySelector('#addLine').onclick = () => { f.querySelector('#lines').insertAdjacentHTML('beforeend', row()); setPrice(f.querySelector('.line:last-child')); };
     f.addEventListener('click', e => { if (e.target.classList.contains('x')) { e.target.parentNode.remove(); upd(); } });
     f.addEventListener('change', e => { if (e.target.name === 'key') setPrice(e.target.parentNode); upd(); });
@@ -1084,6 +1106,56 @@ const ACT = {
     const c = cust(id), os = S.orders.filter(o => o.customerId === id && due(o) > 0);
     const msg = `Assalam o Alaikum ${c.name},\nFriendly reminder of your pending balance with ${S.settings.bizName}:\n${os.map(o => `• ${o.id} (${o.date}): ${rs(due(o))}`).join('\n')}\nTotal: ${rs(custDue(id))}\nJazakAllah.`;
     window.open(`https://wa.me/${c.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+  },
+  editBale(id) {
+    const b = S.bales.find(x => x.id === id), sups = [...new Set(S.bales.map(x => x.supplier))];
+    modal(`Edit bale ${b.id}`, `<datalist id="sups">${sups.map(x => `<option value="${esc(x)}">`).join('')}</datalist>
+      <div class="row"><label>Date<input type="date" name="date" value="${b.date}" required></label><label>Supplier<input name="supplier" list="sups" value="${esc(b.supplier)}" required></label></div>
+      <label>Bale type / grade<input name="type" value="${esc(b.type)}" required></label>
+      <div class="row"><label>Weight (kg)<input type="number" name="weightKg" min="1" step="any" value="${b.weightKg}" required></label><label>Total cost incl. transport (Rs)<input type="number" name="cost" min="0" value="${b.cost}" required></label></div>`,
+      async f => { await rpc('update_bale', {p_bale: b.id, p_date: f.date.value, p_supplier: f.supplier.value, p_type: f.type.value, p_weight: +f.weightKg.value, p_cost: +f.cost.value}); toast(`${b.id} updated`); }, 'Save changes');
+  },
+  deleteBale(id) {
+    const b = S.bales.find(x => x.id === id), n = sum(Object.values(b.yield), q => q);
+    modal(`Delete bale ${b.id}?`, `<p>${esc(b.type)} from ${esc(b.supplier)} · ${b.weightKg} kg · ${rs(b.cost)}${n ? ` · <b>${num(n)} pieces sorted</b>` : ''}. This can't be undone.</p>
+      ${n ? `<label>What happens to its ${num(n)} pieces already in stock?<select name="stock"><option value="remove">Take them out of stock too (recommended)</option><option value="keep">Keep the stock counts as they are</option></select></label>` : ''}`,
+      async f => { await rpc('delete_bale', {p_bale: b.id, p_remove_stock: !n || f.stock.value === 'remove'}); toast(`${b.id} deleted`); if (route()[0] === 'sorting') location.hash = '#bales'; }, 'Delete bale');
+  },
+  async deletePiece(id) {
+    if (!confirm(`Delete piece #${id}? It comes out of stock.`)) return;
+    await rpc('delete_piece', {p_piece: +id}); toast(`Piece #${id} deleted`); refresh();
+  },
+  async deleteOrder(id) {
+    const o = S.orders.find(x => x.id === id);
+    if (!confirm(`Delete ${id}? ${o.status === 'cancelled' ? '' : 'Its items go back into stock. '}This can't be undone.`)) return;
+    await rpc('delete_order', {p_order: id}); toast(`${id} deleted`); refresh();
+  },
+  async deleteCust(id) {
+    if (!confirm(`Delete ${cust(id).name}? This can't be undone.`)) return;
+    await rpc('delete_customer', {p_id: id}); toast('Wholesaler deleted'); refresh();
+  },
+  async renameCat(name) {
+    const v = (prompt(`Rename category “${name}” to:`, name) || '').trim();
+    if (!v || v === name) return;
+    await rpc('rename_category', {p_old: name, p_new: v}); toast(`Renamed to ${v}`); refresh();
+  },
+  async deleteCat(name) {
+    if (!confirm(`Delete the category “${name}”?`)) return;
+    await rpc('delete_category', {p_name: name}); toast(`${name} deleted`); refresh();
+  },
+  async renameBrand(name) {
+    const v = (prompt(`Rename brand “${name}” to:`, name) || '').trim();
+    if (!v || v === name) return;
+    const n = await rpc('rename_brand', {p_old: name, p_new: v}); toast(`Renamed to ${v}${n ? ` · ${n} pieces updated` : ''}`); refresh();
+  },
+  async renameDevice(id) {
+    const d = S.devices.find(x => x.id === id), v = (prompt('Rename sensor box:', d.name) || '').trim();
+    if (!v || v === d.name) return;
+    await q(tb('sensor_devices').update({name: v}).eq('id', id)); toast('Renamed'); refresh();
+  },
+  async deleteDevice(id) {
+    if (!confirm(`Delete sensor box ${id}? It will stop working until you add it again with a new key.`)) return;
+    await q(tb('sensor_devices').delete().eq('id', id)); toast('Sensor box deleted'); refresh();
   },
   askChip(i) { return askSend(ASK_CHIPS[+i]); },
   askClear() { chat = []; render(true); },
