@@ -46,6 +46,16 @@ Emails are sent **from your own Gmail** by a small Google Apps Script (`email-ro
 
 If you change `Code.gs` later, go to **Deploy → Manage deployments → Edit → Version: New version**. That keeps the same URL.
 
+## AI assistant (Ask AI page)
+
+Ask questions like "who owes me the most?" or "which supplier is worth buying from?" and get answers from your real data.
+
+- It runs through the same Google robot as email. **After updating `email-robot/Code.gs`, paste it into Apps Script and use Deploy → Manage deployments → Edit → New version** (the URL stays the same).
+- In the dashboard go to **Settings → AI assistant**, paste your Claude API key (starts with `sk-ant-`) and pick a model, then Save. The key is stored inside your Google robot (Script Properties). It is never kept in the website, the browser or this repository.
+- Every question sends a summary of your business data (stock, sales, suppliers, wholesalers, recent orders) to Claude. That data is cached between questions in the same chat to keep the cost down.
+- Default model is `claude-opus-5`. `claude-sonnet-5` is cheaper. With Opus, refusals are routed to a fallback model automatically.
+- Chats are kept in memory only, so closing the tab clears them.
+
 ## Sensor boxes (ESP32)
 
 Create a box under **Settings → Sensor boxes** to get a device ID and secret key. The box then calls these two functions:

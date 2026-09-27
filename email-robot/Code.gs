@@ -8,6 +8,8 @@
  *  - "Send test email" / "Send digest now" buttons in the dashboard
  *  - Daily digest at 9 AM Pakistan time
  *  - Hourly check: emails straight away when a NEW urgent (red) alert appears
+ *  - "Ask AI" page: relays questions to the Claude API. The API key is stored in this
+ *    script's Script Properties, never in the browser or on GitHub.
  *
  * Setup: see README.md → "Email alerts".
  */
@@ -49,6 +51,9 @@ function doPost(e) {
       installTriggers_();
       return json_({ok: true, message: 'Email robot connected — daily digest at 9 AM, urgent alerts hourly'});
     }
+    if (req.action === 'ai_status') return json_(aiStatus_());
+    if (req.action === 'ai_set_key') return json_(aiSetKey_(req));
+    if (req.action === 'ask') return json_({ok: true, answer: ask_(req)});
     const to = recipients_(settings);
     if (!to.length) throw new Error('No recipient emails set in Settings → Email alerts');
     if (req.action === 'test') {
@@ -231,6 +236,77 @@ function sendDigest_(D, to) {
     <h3 style="margin:14px 0 8px">${A.length ? `${reds} urgent · ${ambers} falling behind · ${A.length - reds - ambers} signals` : 'All clear 👌'}</h3>
     ${alertList_(A)}`);
   send_(D.settings, to, `${reds ? '🔴' : ambers ? '🟠' : '🟢'} ${D.settings.biz_name} — daily digest (${A.length} alerts)`, html);
+}
+
+/* ---------- AI assistant ---------- */
+const AI_DEFAULT_MODEL = 'claude-opus-5';
+const AI_SYSTEM = `You are the business analyst inside the dashboard of a landa (bulk used-clothing bale) wholesale business in Pakistan. The owner buys bales from suppliers, sorts the pieces by category and grade (A, B, C, Reject), and sells to wholesalers, who often pay on credit. All money is in Pakistani rupees (Rs).
+
+Answer only from the BUSINESS DATA below. Never invent numbers; if the data cannot answer the question, say what is missing. Be concise and practical: lead with the answer, then the key numbers, then one or two clear actions. Use short bullet points or a small markdown table when it helps. The owner writes casual English, so keep the tone plain and friendly. Show Rs amounts with thousands separators.`;
+
+function aiStatus_() {
+  const p = PropertiesService.getScriptProperties(), key = p.getProperty('AI_KEY');
+  return {ok: true, configured: !!key, model: p.getProperty('AI_MODEL') || AI_DEFAULT_MODEL, keyHint: key ? '…' + key.slice(-4) : ''};
+}
+
+function aiSetKey_(req) {
+  const p = PropertiesService.getScriptProperties();
+  if (req.key) {
+    const k = String(req.key).trim();
+    if (!/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k)) throw new Error('That does not look like an Anthropic API key (it should start with sk-ant-)');
+    p.setProperty('AI_KEY', k);
+  }
+  if (req.model) {
+    const m = String(req.model).trim();
+    if (!/^claude-[a-z0-9.-]+$/.test(m)) throw new Error('Model names look like claude-opus-5');
+    p.setProperty('AI_MODEL', m);
+  }
+  return aiStatus_();
+}
+
+function ask_(req) {
+  const p = PropertiesService.getScriptProperties();
+  const key = p.getProperty('AI_KEY');
+  if (!key) throw new Error('The AI key is not set yet — add it in Settings → AI assistant');
+  const model = p.getProperty('AI_MODEL') || AI_DEFAULT_MODEL;
+  const question = String(req.question || '').trim().slice(0, 2000);
+  if (!question) throw new Error('Type a question first');
+  const context = String(req.context || '').slice(0, 200000);
+  const history = (Array.isArray(req.history) ? req.history : []).slice(-8)
+    .filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string')
+    .map(m => ({role: m.role, content: m.text.slice(0, 6000)}));
+  while (history.length && history[0].role !== 'user') history.shift();
+  const messages = history.concat([{role: 'user', content: question}]);
+
+  const body = {
+    model: model,
+    max_tokens: 4096,
+    output_config: {effort: 'medium'},
+    system: [
+      {type: 'text', text: AI_SYSTEM},
+      // same data on every question in a chat, so cache it — follow-up questions cost a fraction
+      {type: 'text', text: 'BUSINESS DATA (JSON):\n' + context, cache_control: {type: 'ephemeral'}},
+    ],
+    messages: messages,
+  };
+  const headers = {'x-api-key': key, 'anthropic-version': '2023-06-01'};
+  if (/^claude-(opus-5|fable-5-1)$/.test(model)) {   // route refusals to a fallback model automatically
+    body.fallbacks = 'default';
+    headers['anthropic-beta'] = 'server-side-fallback-2026-07-01';
+  }
+  const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+    method: 'post', contentType: 'application/json', headers: headers, payload: JSON.stringify(body), muteHttpExceptions: true,
+  });
+  const code = res.getResponseCode(), text = res.getContentText();
+  let data; try { data = JSON.parse(text); } catch (e) { data = {}; }
+  if (code >= 300) {
+    if (code === 401) throw new Error('Anthropic rejected the API key — check it in Settings → AI assistant');
+    throw new Error('Claude error ' + code + ': ' + ((data.error && data.error.message) || text.slice(0, 300)));
+  }
+  if (data.stop_reason === 'refusal') throw new Error('Claude declined to answer that one — try rephrasing it');
+  const answer = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+  if (!answer) throw new Error('Claude sent back an empty answer — try again');
+  return data.stop_reason === 'max_tokens' ? answer + '\n\n_(answer was cut short — ask me to continue)_' : answer;
 }
 
 function json_(o) {
