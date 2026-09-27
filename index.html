@@ -179,19 +179,43 @@ details[open] summary{margin-bottom:12px}
 #lock form.shake{animation:shake .4s}
 @keyframes shake{20%,60%{transform:translateX(-9px)}40%,80%{transform:translateX(9px)}}
 #splash{z-index:80;transition:opacity .7s ease,transform .7s ease,filter .7s ease;cursor:pointer}
-#splash.out{opacity:0;transform:scale(1.06);filter:blur(6px);pointer-events:none}
-.sp-inner{position:relative;text-align:center;color:var(--ink)}
+#splash.out{opacity:0;transform:scale(1.04);filter:blur(4px);pointer-events:none}
+.sp-inner{position:relative;text-align:center;color:var(--ink);transition:transform .7s cubic-bezier(.5,0,.7,.4)}
+#splash.out .sp-inner{transform:scale(.92)}
+.sp-logo{position:relative;display:inline-block}
+.sp-halo{position:absolute;inset:-34px;border-radius:50%;background:radial-gradient(closest-side,rgba(13,148,136,.32),transparent);animation:halo 2.4s ease-in-out infinite}
+@keyframes halo{50%{transform:scale(1.18);opacity:.55}}
+.sp-spark{position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px;border-radius:50%;background:#2dd4bf;box-shadow:0 0 10px 2px rgba(45,212,191,.9);opacity:0;animation:spark 1.1s cubic-bezier(.2,.8,.3,1) both;animation-delay:calc(.55s + var(--k)*.03s)}
+@keyframes spark{0%{opacity:0;transform:rotate(var(--a)) translateX(0) scale(.4)}25%{opacity:1}100%{opacity:0;transform:rotate(var(--a)) translateX(92px) scale(1)}}
+.sp-name{font-size:40px;font-weight:800;letter-spacing:.34em;margin:18px 0 0 .34em;color:var(--ink);text-shadow:0 0 22px rgba(13,148,136,.28)}
+.sp-name span{display:inline-block;opacity:0;animation:letter .7s cubic-bezier(.2,1.6,.4,1) both;animation-delay:calc(.5s + var(--k)*.08s)}
+@keyframes letter{from{opacity:0;transform:translateY(-30px) scale(.5);filter:blur(5px)}to{opacity:1;transform:none;filter:none}}
+.sp-tag{color:var(--mute);letter-spacing:.22em;text-transform:uppercase;font-size:11.5px;font-weight:600;margin-top:4px;animation:rise .7s .95s both}
+.sp-stage{position:relative;width:340px;height:156px;margin:16px auto 0}
+.sp-bin{position:absolute;bottom:0;left:calc(50% - 40px + var(--dx));width:80px;height:56px;border-radius:14px;background:#fff;border:1.5px solid rgba(var(--c),.35);box-shadow:0 10px 26px -10px rgba(var(--c),.6);display:flex;flex-direction:column;align-items:center;justify-content:center;animation:rise .6s both;animation-delay:calc(.9s + var(--k)*.08s)}
+.sp-bin b{font-size:21px;line-height:1.1;font-weight:800;color:rgb(var(--c));font-variant-numeric:tabular-nums}
+.sp-bin small{font-size:9.5px;letter-spacing:.14em;color:var(--mute);font-weight:700}
+.sp-bin.hit{animation:binhit .4s cubic-bezier(.3,1.6,.5,1)}
+@keyframes binhit{40%{transform:scale(1.12);box-shadow:0 0 0 7px rgba(var(--c),.14),0 12px 34px -6px rgba(var(--c),.85)}}
+.sp-item{position:absolute;left:calc(50% - 17px);top:0;width:34px;height:34px;border-radius:10px;background:linear-gradient(145deg,rgba(var(--c),1),rgba(var(--c),.72));box-shadow:0 8px 18px -6px rgba(var(--c),.9);display:grid;place-items:center;opacity:0;animation:drop .85s cubic-bezier(.45,0,.6,1) both;animation-delay:var(--d)}
+.sp-item svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}
+@keyframes drop{0%{opacity:0;transform:translate(0,-26px) scale(.5) rotate(0)}18%{opacity:1;transform:translate(0,4px) scale(1.05) rotate(calc(var(--r)*.3))}82%{opacity:1;transform:translate(var(--dx),92px) scale(.9) rotate(var(--r))}100%{opacity:0;transform:translate(var(--dx),112px) scale(.3) rotate(var(--r))}}
+.sp-stats{display:flex;gap:30px;justify-content:center;margin-top:24px;min-height:48px}
+.sp-stat{animation:rise .55s both;animation-delay:calc(var(--k)*.09s)}
+.sp-stat b{display:block;font-size:21px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.sp-stat span{font-size:10.5px;color:var(--mute);text-transform:uppercase;letter-spacing:.09em;font-weight:600}
+.sp-bar{width:220px;height:3px;background:var(--line);border-radius:3px;margin:22px auto 10px;overflow:hidden}
+.sp-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#0d9488,#2dd4bf);box-shadow:0 0 12px 1px rgba(13,148,136,.8);border-radius:3px;animation:fill 3.3s .2s cubic-bezier(.4,0,.2,1) forwards}
+.sp-hint{color:var(--mute);font-size:13px;animation:rise .6s .6s both}
+.sp-ring{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px;border-radius:50%;border:2px solid rgba(13,148,136,.55);box-shadow:0 0 34px rgba(13,148,136,.55),inset 0 0 20px rgba(13,148,136,.3);opacity:0;pointer-events:none}
+#splash.out .sp-ring{animation:ring .75s ease-out both}
+@keyframes ring{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(26)}}
+@media(max-width:420px){.sp-stage{transform:scale(.85)}.sp-name{font-size:32px}.sp-stats{gap:18px}}
 .sp-mark{width:104px;height:104px;filter:drop-shadow(0 14px 34px rgba(13,148,136,.55));animation:popin .9s cubic-bezier(.2,1.4,.4,1) both}
 .sp-mark .hang{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.25s .35s cubic-bezier(.6,0,.2,1) forwards}
 @keyframes draw{to{stroke-dashoffset:0}}
 @keyframes popin{from{opacity:0;transform:scale(.4) rotate(-12deg)}to{opacity:1;transform:none}}
-.sp-name{font-size:38px;font-weight:800;letter-spacing:.42em;margin:22px 0 0 .42em;background:linear-gradient(90deg,#0f172a,#0d9488 50%,#0f172a);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:rise .8s .55s both,shine 2.6s 1.2s linear infinite}
-@keyframes shine{to{background-position:-200% 0}}
-.sp-tag{color:var(--mute);letter-spacing:.2em;text-transform:uppercase;font-size:12px;margin-top:6px;animation:rise .8s .8s both}
-.sp-bar{width:190px;height:3px;background:var(--line);border-radius:3px;margin:34px auto 12px;overflow:hidden;animation:rise .6s 1s both}
-.sp-bar i{display:block;height:100%;width:0;background:var(--brand);box-shadow:0 0 12px 1px rgba(13,148,136,.8);border-radius:3px;animation:fill 2.1s .9s cubic-bezier(.4,0,.2,1) forwards}
 @keyframes fill{to{width:100%}}
-.sp-hint{color:var(--mute);font-size:13px;animation:rise .6s 1.1s both}
 /* modal + toast + topbar */
 #modal{position:fixed;inset:0;background:var(--overlay);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:10;overflow:auto;animation:fade .2s both}
 #modal[hidden]{display:none}
@@ -239,10 +263,7 @@ code{background:var(--card2);border:1px solid var(--line);padding:2px 6px;border
 </head>
 <body>
 <div id="topbar"></div>
-<div id="splash" hidden><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
-  <div class="sp-inner"><svg class="sp-mark" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="mgs" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2dd4bf"/><stop offset="1" stop-color="#0e7490"/></linearGradient></defs><rect width="64" height="64" rx="17" fill="url(#mgs)"/><path class="hang" pathLength="1" d="M26 22a6 6 0 1 1 7.2 5.9c-1 .2-1.2.8-1.2 1.7V32M32 32 14 44h36Z" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <div class="sp-name">LANDA</div><div class="sp-tag">Bale · Sort · Sell</div>
-    <div class="sp-bar"><i></i></div><div class="sp-hint" id="spHint">Preparing your dashboard…</div></div></div>
+<div id="splash" hidden></div>
 <aside id="nav"></aside>
 <main id="app"></main>
 <div id="modal" hidden></div>
@@ -407,13 +428,18 @@ $('#lockForm').addEventListener('submit', async e => {
 async function start() {
   makeClient();
   if (!token) return showLock();
-  const {data, error} = await sb.rpc(T('session_is_valid'));
-  if (error) return showLock(/schema cache|does not exist/.test(error.message) ? 'Database is not set up yet — run supabase/setup.sql' : 'Cannot reach the database: ' + error.message);
-  if (!data) { sessionStorage.removeItem(TOKEN_KEY); token = null; makeClient(); return showLock(); }
   $('#lock').hidden = true;
-  try { await loadAll(); } catch (e) { return; }
+  const work = (async () => {
+    const {data, error} = await sb.rpc(T('session_is_valid'));
+    if (error) { showLock(/schema cache|does not exist/.test(error.message) ? 'Database is not set up yet — run supabase/setup.sql' : 'Cannot reach the database: ' + error.message); return false; }
+    if (!data) { sessionStorage.removeItem(TOKEN_KEY); token = null; makeClient(); showLock(); return false; }
+    try { await loadAll(); return true; } catch (e) { return false; }
+  })();
+  if (!(await playSplash(work))) return;
+  $('#lock').hidden = true;
   lastPieceId = S.recent[0]?.id || 0;
-  playSplash(() => { render(); subscribe(); });
+  render();
+  subscribe();
 }
 
 /* ---------- analytics ---------- */
@@ -511,17 +537,75 @@ function entrance(root) {
   countUp(root);
 }
 const greet = () => { const h = new Date().getHours(); return h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
-// Plays once per browser tab, right after unlocking. Tap to skip.
-function playSplash(done) {
+// Plays every time the app opens (new tab, reopen, reload) and after every login.
+// Runs while the data loads, so it costs no extra waiting. Tap to skip.
+const SP_ICONS = {
+  tee: '<path d="M8 4 4 7l2 3h2v10h8V10h2l2-3-4-3-2 2h-4z"/>',
+  jeans: '<path d="M7 3h10l1 18h-4.5L12 11l-1.5 10H6z"/><path d="M7 7h10"/>',
+  jacket: '<path d="M9 3 5 5v16h5v-7h4v7h5V5l-4-2-3 4z"/><path d="M12 7v7"/>',
+  dress: '<path d="M10 3h4l-.5 4 4.5 14H6l4.5-14z"/>',
+};
+const SP_BINS = [['A', '34,197,94', -112], ['B', '59,130,246', 0], ['C', '245,158,11', 112]];
+function splashMarkup() {
+  const drops = [['tee', 0], ['jeans', 1], ['jacket', 0], ['dress', 2], ['tee', 1], ['jeans', 0], ['jacket', 2], ['dress', 1], ['tee', 0]];
+  const sparks = [...Array(12)].map((_, k) => `<i class="sp-spark" style="--k:${k};--a:${k * 30}deg"></i>`).join('');
+  return `<div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div><div class="sp-ring"></div>
+  <div class="sp-inner">
+    <div class="sp-logo"><div class="sp-halo"></div>${sparks}${MARK.replace('class="mark"', 'class="sp-mark"')}</div>
+    <div class="sp-name">${[...'LANDA'].map((c, k) => `<span style="--k:${k}">${c}</span>`).join('')}</div>
+    <div class="sp-tag">Bale · Sort · Sell</div>
+    <div class="sp-stage">
+      ${SP_BINS.map(([g, c, dx], k) => `<div class="sp-bin" id="spBin${g}" style="--c:${c};--dx:${dx}px;--k:${k}"><b>0</b><small>GRADE ${g}</small></div>`).join('')}
+      ${drops.map(([ic, b], n) => `<div class="sp-item" data-bin="${SP_BINS[b][0]}" style="--c:${SP_BINS[b][1]};--dx:${SP_BINS[b][2]}px;--r:${(n % 2 ? 1 : -1) * (40 + n * 17)}deg;--d:${(1.1 + n * .19).toFixed(2)}s"><svg viewBox="0 0 24 24">${SP_ICONS[ic]}</svg></div>`).join('')}
+    </div>
+    <div class="sp-stats" id="spStats"></div>
+    <div class="sp-bar"><i></i></div>
+    <div class="sp-hint" id="spHint">${greet()} — getting everything ready…</div>
+  </div>`;
+}
+function splashStats() {
+  if (!S) return;
+  const month = today().slice(0, 7);
+  const stats = [
+    [sum(Object.values(S.stock), x => x.qty), 'pcs in stock', ''],
+    [sum(S.orders.filter(o => live(o) && o.date.startsWith(month)), total), 'sales this month', 'Rs '],
+    [S.orders.filter(o => o.status === 'new' || o.status === 'packed').length, 'orders to send', ''],
+  ];
+  $('#spStats').innerHTML = stats.map(([v, l, pre], k) => `<div class="sp-stat" style="--k:${k}"><b data-v="${Math.round(v)}" data-pre="${pre}">${pre}0</b><span>${l}</span></div>`).join('');
+  $('#spStats').querySelectorAll('b').forEach(el => {
+    const target = +el.dataset.v, pre = el.dataset.pre, t0 = performance.now();
+    const step = t => { const k = Math.min(1, (t - t0) / 1100), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = pre + Math.round(target * e).toLocaleString('en-PK'); if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+    setTimeout(() => { el.textContent = pre + target.toLocaleString('en-PK'); }, 1250);   // in case the tab is in the background
+  });
+  $('#spHint').textContent = `${greet()} — welcome back to ${S.settings.bizName}`;
+}
+function playSplash(work) {
   const sp = $('#splash');
-  if (reduceMotion || sessionStorage.getItem('landa-splash')) return done();
-  sessionStorage.setItem('landa-splash', '1');
-  sp.hidden = false;
-  $('#spHint').textContent = `${greet()} — preparing ${S?.settings?.bizName || 'your dashboard'}…`;
-  let finished = false;
-  const finish = () => { if (finished) return; finished = true; sp.classList.add('out'); done(); setTimeout(() => { sp.hidden = true; sp.classList.remove('out'); }, 750); };
-  sp.onclick = finish;
-  setTimeout(finish, 3000);
+  if (reduceMotion) return work;
+  sp.innerHTML = splashMarkup();
+  sp.classList.remove('out'); sp.hidden = false;
+  // each item lands in its box: bump that box's counter with a glow
+  sp.querySelectorAll('.sp-item').forEach(it => it.addEventListener('animationend', () => {
+    const bin = $('#spBin' + it.dataset.bin), b = bin?.querySelector('b');
+    if (!b) return;
+    b.textContent = +b.textContent + 1;
+    bin.classList.remove('hit'); void bin.offsetWidth; bin.classList.add('hit');
+  }));
+  const MIN = 3600, t0 = Date.now();
+  return new Promise(resolve => {
+    let result = null, skipped = false, ended = false;
+    const end = ok => {
+      if (ended) return; ended = true;
+      sp.classList.add('out'); resolve(ok);
+      setTimeout(() => { sp.hidden = true; sp.classList.remove('out'); sp.innerHTML = ''; }, 800);
+    };
+    const check = () => { if (result === null) return; if (!result) return end(false); if (skipped || Date.now() - t0 >= MIN) end(true); };
+    work.then(ok => { result = !!ok; if (ok) splashStats(); check(); setTimeout(check, Math.max(0, MIN - (Date.now() - t0))); },
+              () => { result = false; check(); });
+    sp.onclick = () => { skipped = true; check(); };
+  });
 }
 
 /* ---------- pages ---------- */
