@@ -329,7 +329,7 @@ function makeClient() {
   });
 }
 async function rpc(name, args = {}) {
-  busy(1); const {data, error} = await sb.rpc(T(name), args).finally(() => busy(0));
+  busy(1); const {data, error} = await Promise.resolve(sb.rpc(T(name), args)).finally(() => busy(0));
   if (error) { if (/Locked/.test(error.message)) showLock('Session expired — log in again'); throw new Error(error.message); }
   return data;
 }
