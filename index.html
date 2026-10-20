@@ -268,6 +268,14 @@ body.revealing{--rise0:280ms}
 .seg{display:flex;gap:6px;background:var(--card2);border:1px solid var(--line);padding:4px;border-radius:13px;margin:6px 0 12px}
 .seg button{flex:1;border:0;background:transparent;border-radius:10px;padding:9px;font:inherit;font-weight:600;color:var(--mute);cursor:pointer;transition:all .2s}
 .seg button.on{background:#fff;color:var(--brand);box-shadow:0 2px 10px -2px rgba(13,148,136,.4)}
+.pgrid{display:flex;flex-wrap:wrap;gap:5px;max-height:190px;overflow-y:auto;padding:2px}
+.pchip{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 8px;font:600 12px ui-monospace,Menlo,monospace;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.pchip:hover{transform:translateY(-1px);box-shadow:0 4px 12px -4px rgba(13,148,136,.5)}
+.pchip.cA{background:var(--okbg);color:var(--ok);border-color:transparent}.pchip.cW{background:var(--infobg);color:var(--info);border-color:transparent}
+.pchip.cM{background:var(--warnbg);color:var(--warn);border-color:transparent}.pchip.cD{background:var(--dangerbg);color:var(--danger);border-color:transparent}
+.batchlink{display:flex;align-items:center;justify-content:space-between;gap:10px;background:linear-gradient(135deg,#f0fdfa,#fff);border:1.5px solid rgba(13,148,136,.3);border-radius:14px;padding:10px 14px;margin-bottom:12px;box-shadow:0 8px 22px -14px rgba(13,148,136,.6)}
+.batchlink .mono{font-weight:700;color:var(--brand)}
+.cmp{font-size:12.5px;margin-top:6px}.cmp b{font-variant-numeric:tabular-nums}
 .tagtop{display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:center;margin-bottom:14px}
 .tagbc{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:84px;display:grid;place-items:center}
 .tagbc svg{width:100%;height:auto}
@@ -1066,7 +1074,7 @@ function aiContext() {
     totals: {stockPieces: sum(Object.values(S.stock), s => s.qty), stockValueAtSellingPrice: r(sum(Object.values(S.stock), s => s.qty * s.price)), moneyToCollect: r(sum(S.orders, due))},
     stock, salesLast90DaysByItem: sales90, monthlySales: monthly, bales, suppliers, customers, recentOrders: orders, brandsSorted: brands,
     activeAlerts: alerts().map(a => `[${a.type}] ${a.text}`),
-    barcodeLabels: S.tagsReady ? {total: S.tags.length, byStep: Object.fromEntries(S.settings.tagStages.map(st => [st, S.tags.filter(t => t.stage === st).length])), latest: S.tags.slice(0, 40).map(t => ({code: t.code, brand: t.brand, productType: t.product_type || t.label, supplier: t.supplier, date: t.lot_date, a: t.count_a, washing: t.count_washing, mending: t.count_mending, damaged: t.count_damaged, washingRecovered: t.washing_recovered, mendingRecovered: t.mending_recovered, step: t.stage, where: t.location, lastScan: t.last_scan_at}))} : null});
+    barcodeLabels: S.tagsReady ? {batches: S.tags.filter(t => !isPiece(t)).length, pieceBarcodes: S.tags.filter(isPiece).length, byStep: Object.fromEntries(S.settings.tagStages.map(st => [st, S.tags.filter(t => !isPiece(t) && t.stage === st).length])), latest: S.tags.filter(t => !isPiece(t)).slice(0, 40).map(t => ({code: t.code, piecesNow: piecesOf(t.code).length ? nowCounts(t.code) : null, brand: t.brand, productType: t.product_type || t.label, supplier: t.supplier, date: t.lot_date, a: t.count_a, washing: t.count_washing, mending: t.count_mending, damaged: t.count_damaged, washingRecovered: t.washing_recovered, mendingRecovered: t.mending_recovered, step: t.stage, where: t.location, lastScan: t.last_scan_at}))} : null});
 }
 function aiCard() {
   const s = S.settings, a = aiState && typeof aiState === 'object' && !aiState.error ? aiState : null;
@@ -1163,43 +1171,56 @@ function lotCode(v) {
   const [y, m, d] = String(v.date || '').split('-');
   return initialsOf(v.supplier, 2) + initialsOf(v.brand, 1) + initialsOf(v.type, 2) + (y ? d + m + y : '') + 'W' + (v.w || 0) + '-' + v.total;
 }
-const isLot = t => !!(t.product_type || t.supplier);
+const isPiece = t => !!t.batch_code;
+const isLot = t => !isPiece(t) && !!(t.product_type || t.supplier);
+const piecesOf = code => S.tags.filter(x => x.batch_code === code).sort((a, b) => a.code.localeCompare(b.code));
+const COND = ['A', 'Washing', 'Mending', 'Damaged'], COND_CLS = {A: 'cA', Washing: 'cW', Mending: 'cM', Damaged: 'cD'};
+const condPill = c => c ? `<span class="pill" style="background:var(--${{A: 'okbg', Washing: 'infobg', Mending: 'warnbg', Damaged: 'dangerbg'}[c]});color:var(--${{A: 'ok', Washing: 'info', Mending: 'warn', Damaged: 'danger'}[c]})">${esc(c)}</span>` : '';
+function nowCounts(code) {
+  const c = {A: 0, Washing: 0, Mending: 0, Damaged: 0};
+  piecesOf(code).forEach(x => { if (c[x.condition] != null) c[x.condition]++; });
+  return c;
+}
 const lotTotal = t => (t.count_a || 0) + (t.count_washing || 0) + (t.count_mending || 0) + (t.count_damaged || 0);
 const dmy = d => d ? d.split('-').reverse().join('/') : '';
 const countsHtml = t => `<div class="counts"><i class="cA">A ${t.count_a || 0}</i><i class="cW">Washing ${t.count_washing || 0}</i><i class="cM">Mending ${t.count_mending || 0}</i><i class="cD">Damaged ${t.count_damaged || 0}</i><i>Total ${lotTotal(t)}</i></div>`;
 const treatText = t => [t.washing_flagged != null ? `Washing ${t.washing_recovered}/${t.washing_flagged} recovered` : '', t.mending_flagged != null ? `Mending ${t.mending_recovered}/${t.mending_flagged} recovered` : ''].filter(Boolean).join(' · ');
-const tagDetails = t => isLot(t)
-  ? `A ${t.count_a || 0} · W ${t.count_washing || 0} · M ${t.count_mending || 0} · D ${t.count_damaged || 0} = <b>${lotTotal(t)}</b>${treatText(t) ? `<div class="muted">${esc(treatText(t))}</div>` : ''}`
+const tagDetails = t => isPiece(t) ? `Piece of <b class="mono">${esc(t.batch_code)}</b> · ${condPill(t.condition)}`
+  : isLot(t)
+  ? (() => { const ps = piecesOf(t.code), n = ps.length ? nowCounts(t.code) : null;
+      return `A ${t.count_a || 0} · W ${t.count_washing || 0} · M ${t.count_mending || 0} · D ${t.count_damaged || 0} = <b>${lotTotal(t)}</b>`
+        + (n ? `<div class="muted">Now: A ${n.A} · W ${n.Washing} · M ${n.Mending} · D ${n.Damaged} · ${ps.length} piece barcodes</div>` : treatText(t) ? `<div class="muted">${esc(treatText(t))}</div>` : ''); })()
   : [t.category && t.grade ? `${t.category} · ${t.grade}` : t.category || t.grade, t.qty != null ? `${num(t.qty)} pcs` : '', t.brand].filter(Boolean).map(esc).join(' · ');
-const tagWhat = t => isLot(t)
+const tagWhat = t => isLot(t) || isPiece(t)
   ? `<b>${esc(t.brand || '')}</b> · ${esc(t.product_type || '')}<div class="muted" style="font-size:12px">${esc(t.supplier || '')}${t.lot_date ? ' · ' + dmy(t.lot_date) : ''}</div>`
   : `${t.label ? esc(t.label) : `<span class="muted">${TAG_KINDS[t.kind] || t.kind}</span>`}<div class="muted" style="font-size:12px">${TAG_KINDS[t.kind] || t.kind}${t.ref_id ? ' · ' + esc(t.ref_id) : ''}</div>`;
 const fullTime = ts => new Date(ts).toLocaleString('en-GB', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
 let tagPicked = new Set();
 
 PAGES.tracking = filter => {
-  const top = head('Barcodes', 'Fill in the lot, print its barcode, then scan it at every step — always know where everything is',
-    `<button class="btn ghost" data-act="csv" data-id="tags">Export CSV</button><button class="btn ghost" data-act="scanCamera">📷 Scan with camera</button><button class="btn" data-act="newTags">+ New barcode</button>`);
+  const top = head('Barcodes', 'Make a batch, print a barcode for it and for every piece, then scan to update — the batch keeps itself up to date',
+    `<button class="btn ghost" data-act="csv" data-id="tags">Export CSV</button><button class="btn ghost" data-act="scanCamera">📷 Scan with camera</button><button class="btn" data-act="newTags">+ New batch</button>`);
   if (!S.tagsReady) return top + `<div class="card"><p class="low" style="margin:0">One database step: run <code>supabase/007_barcode_tracking.sql</code> and <code>supabase/008_barcode_lots.sql</code> in the Supabase SQL editor, then refresh.</p></div>`;
   const f = filter ? decodeURIComponent(filter) : '';
   const stages = S.settings.tagStages;
-  const list = S.tags.filter(t => !f || t.stage === f);
-  const known = new Set(stages), extra = [...new Set(S.tags.map(t => t.stage).filter(x => !known.has(x)))];
+  const main = S.tags.filter(t => !isPiece(t));
+  const list = main.filter(t => !f || t.stage === f);
+  const known = new Set(stages), extra = [...new Set(main.map(t => t.stage).filter(x => !known.has(x)))];
   return top + `
-  <form class="card scanbox" id="scanForm"><div class="scanrow">${BC_ICON}<input name="code" data-nokeep autocomplete="off" placeholder="Scan a barcode, or type its item code and press Enter"><button class="btn">Open</button></div>
+  <form class="card scanbox" id="scanForm"><div class="scanrow">${BC_ICON}<input name="code" data-nokeep autocomplete="off" placeholder="Scan a batch or piece barcode, or type its code and press Enter"><button class="btn">Open</button></div>
     <p class="muted">Handheld USB / Bluetooth barcode scanners work on any page of the app — just scan and the item opens.</p></form>
-  <div class="tabs"><a href="#tracking" class="${!f ? 'on' : ''}">All (${S.tags.length})</a>${[...stages, ...extra].map(st => `<a href="#tracking/${encodeURIComponent(st)}" class="${f === st ? 'on' : ''}">${esc(st)} (${S.tags.filter(t => t.stage === st).length})</a>`).join('')}</div>
+  <div class="tabs"><a href="#tracking" class="${!f ? 'on' : ''}">All batches (${main.length})</a>${[...stages, ...extra].map(st => `<a href="#tracking/${encodeURIComponent(st)}" class="${f === st ? 'on' : ''}">${esc(st)} (${main.filter(t => t.stage === st).length})</a>`).join('')}</div>
   <div class="card tbl">
-    <div class="tblhead"><input id="tagSearch" data-nokeep placeholder="Search code, brand, supplier, place…"><div class="btns"><span class="muted" id="pickCount"></span><button class="btn ghost sm" data-act="printTags" data-id="">🖨 Print selected</button></div></div>
-    <table><tr><th style="width:30px"><input type="checkbox" id="pickAll" data-nokeep></th><th>Item code</th><th>Item</th><th>Pieces</th><th>Step</th><th>Where</th><th>Last scan</th><th class="n">Scans</th><th></th></tr>
-    ${list.map(t => `<tr data-search="${esc([t.code, t.label, t.brand, t.product_type, t.supplier, t.ref_id, t.category, t.stage, t.location, t.note].join(' ').toLowerCase())}">
+    <div class="tblhead"><input id="tagSearch" data-nokeep placeholder="Search batch or piece code, brand, supplier, place…"><div class="btns"><span class="muted" id="pickCount"></span><button class="btn ghost sm" data-act="printTags" data-id="">🖨 Print selected</button></div></div>
+    <table><tr><th style="width:30px"><input type="checkbox" id="pickAll" data-nokeep></th><th>Batch code</th><th>Item</th><th>Pieces</th><th>Step</th><th>Where</th><th>Last scan</th><th class="n">Scans</th><th></th></tr>
+    ${list.map(t => `<tr data-search="${esc([t.code, t.label, t.brand, t.product_type, t.supplier, t.ref_id, t.category, t.stage, t.location, t.note, ...piecesOf(t.code).map(x => x.code)].join(' ').toLowerCase())}">
       <td><input type="checkbox" class="tagpick" value="${esc(t.code)}" data-nokeep ${tagPicked.has(t.code) ? 'checked' : ''}></td>
       <td><a href="#" data-act="openTag" data-id="${esc(t.code)}" class="mono" style="font-weight:700;color:var(--brand);text-decoration:none">${esc(t.code)}</a></td>
       <td>${tagWhat(t)}</td><td style="font-size:12.5px;white-space:normal;min-width:160px">${tagDetails(t) || '<span class="muted">—</span>'}</td>
       <td>${stagePill(t.stage)}</td><td>${t.location ? '📍 ' + esc(t.location) : '<span class="muted">—</span>'}</td>
       <td>${since(t.last_scan_at)}<div class="muted" style="font-size:12px">${fullTime(t.last_scan_at)}</div></td><td class="n">${(t.scans || []).length}</td>
-      <td><div class="btns"><button class="btn sm" data-act="openTag" data-id="${esc(t.code)}">Open</button><button class="btn ghost sm" data-act="printTags" data-id="${esc(t.code)}">🖨</button></div></td></tr>`).join('')
-      || `<tr><td colspan="9" class="empty">${S.tags.length ? 'Nothing at this step.' : 'No barcodes yet — press “+ New barcode” to make your first one.'}</td></tr>`}
+      <td><div class="btns"><button class="btn sm" data-act="openTag" data-id="${esc(t.code)}">Open</button><button class="btn ghost sm" data-act="printTags" data-id="${esc(t.code)}" title="Print">🖨</button></div></td></tr>`).join('')
+      || `<tr><td colspan="9" class="empty">${S.tags.length ? 'Nothing at this step.' : 'No batches yet — press “+ New batch” to make your first one.'}</td></tr>`}
     </table></div>`;
 };
 AFTER.tracking = () => {
@@ -1250,7 +1271,8 @@ function openTag(code) {
   stopCam();
   const t = tagBy(code);
   if (!t) return toast(`No item found with code ${code}`);
-  const lot = isLot(t);
+  if (isPiece(t)) return openPiece(t);
+  const lot = isLot(t), pieces = piecesOf(t.code), nc = pieces.length ? nowCounts(t.code) : null;
   const stages = S.settings.tagStages, locs = S.settings.tagLocations;
   const allStages = stages.includes(t.stage) ? stages : [...stages, t.stage];
   let stage = stages[Math.min(stages.indexOf(t.stage) + 1, stages.length - 1)] || stages[0];   // most scans move it one step on
@@ -1261,19 +1283,24 @@ function openTag(code) {
     <div class="tagtop"><div class="tagbc" id="tagBc"><span class="muted">…</span></div>
       ${lot ? `<div><div class="facts"><div><span>Brand</span><b>${esc(t.brand || '—')}</b></div><div><span>Product type</span><b>${esc(t.product_type || '—')}</b></div>
           <div><span>Supplier</span><b>${esc(t.supplier || '—')}</b></div><div><span>Date</span><b>${dmy(t.lot_date) || '—'}</b></div></div>${countsHtml(t)}
+          ${nc ? `<div class="cmp"><span class="muted">Now, from the pieces:</span> <b style="color:var(--ok)">A ${nc.A}</b> · <b style="color:var(--info)">Washing ${nc.Washing}</b> · <b style="color:var(--warn)">Mending ${nc.Mending}</b> · <b style="color:var(--danger)">Damaged ${nc.Damaged}</b></div>` : ''}
           ${treatText(t) ? `<div class="muted" style="margin-top:6px;font-size:12.5px">🧺 ${esc(treatText(t))}</div>` : ''}</div>`
         : `<div><b style="font-size:16px">${t.label ? esc(t.label) : TAG_KINDS[t.kind]}</b><div class="muted">${TAG_KINDS[t.kind] || t.kind}${t.ref_id ? ' · linked to ' + esc(t.ref_id) : ''}</div><div style="margin-top:4px">${tagDetails(t) || ''}</div></div>`}</div>
     <div class="tagnow"><div><span class="muted">Now:</span> ${stagePill(t.stage)} ${t.location ? `<b>📍 ${esc(t.location)}</b>` : ''}</div>
       <div class="muted" style="margin-top:4px">Last scanned <b style="font-size:13px;color:var(--ink)">${since(t.last_scan_at)}</b> — ${fullTime(t.last_scan_at)}${t.note ? ` · “${esc(t.note)}”` : ''}</div></div>
-    <h2 style="margin:4px 0 0">Select action</h2>
+    ${pieces.length ? `<h2 style="margin:4px 0 8px">Pieces <span class="muted" style="font-weight:400">(${pieces.length} — tap one to open it)</span></h2>
+      <div class="pgrid">${pieces.map(x => `<button type="button" class="pchip ${COND_CLS[x.condition] || ''}" data-piece="${esc(x.code)}" title="${esc(x.condition || '')} · ${esc(x.stage)}${x.location ? ' · ' + esc(x.location) : ''}">${esc(x.code.slice(t.code.length + 1))}</button>`).join('')}</div>` : ''}
+    <h2 style="margin:12px 0 0">Select action</h2>
     <div class="seg"><button type="button" class="on" data-mode="move">📍 Update where it is</button>${lot ? '<button type="button" data-mode="treat">🧺 Treatment</button>' : ''}</div>
     <div id="pMove"><div class="brandbtns" style="margin-top:0">${allStages.map(st => `<button type="button" class="btn ${st === stage ? '' : 'ghost'} sm" data-stage="${esc(st)}">${esc(st)}</button>`).join('')}</div>
       <div class="row"><label>Where is it now?<select name="loc">${[...new Set([t.location, ...locs].filter(Boolean))].map(l => `<option ${l === t.location ? 'selected' : ''}>${esc(l)}</option>`).join('')}<option value="">— other / not set —</option></select></label>
-      <label>Note <span style="font-weight:400">(optional)</span><input name="note" data-nokeep placeholder="e.g. loaded on Daewoo truck"></label></div></div>
+      <label>Note <span style="font-weight:400">(optional)</span><input name="note" data-nokeep placeholder="e.g. loaded on Daewoo truck"></label></div>
+      ${pieces.length ? `<label class="muted" style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" name="withPieces" data-nokeep checked style="width:auto;margin:0"> Move all ${pieces.length} pieces with the batch</label>` : ''}</div>
     ${lot ? `<div id="pTreat" hidden><div class="brandbtns" style="margin-top:0"><button type="button" class="btn ${treat === 'washing' ? '' : 'ghost'} sm" data-treat="washing">Washing</button><button type="button" class="btn ${treat === 'mending' ? '' : 'ghost'} sm" data-treat="mending">Mending</button></div>
       <div class="row"><label>Originally flagged<input type="number" name="flagged" min="0" value="${flaggedFor(treat)}"></label><label>Recovered<input type="number" name="recovered" min="0" value="${t[treat + '_recovered'] ?? ''}" placeholder="how many came back good"></label></div>
-      <label>Note <span style="font-weight:400">(optional)</span><input name="tnote" data-nokeep></label></div>` : ''}
-    ${lot ? `<details style="margin:4px 0 12px"><summary><b>✎ Edit details</b></summary>${lotFieldsHtml(t)}<button type="button" class="btn ghost sm" id="saveDetails">Save details</button></details>` : ''}
+      <label>Note <span style="font-weight:400">(optional)</span><input name="tnote" data-nokeep></label>
+      ${pieces.length ? '<p class="muted" style="margin:0;font-size:12.5px">Saving switches that many of this batch’s pieces from Washing / Mending to A, so the pieces and the batch stay in step.</p>' : ''}</div>` : ''}
+    ${lot ? `<details style="margin:4px 0 12px"><summary><b>✎ Edit details</b></summary>${lotFieldsHtml(t)}${pieces.length ? '<p class="muted" style="margin:-4px 0 10px;font-size:12.5px">These are the counts entered at the start. The live counts come from the pieces.</p>' : ''}<button type="button" class="btn ghost sm" id="saveDetails">Save details</button></details>` : ''}
     <h2 style="margin:6px 0 10px">History <span class="muted" style="font-weight:400">(${scans.length} update${scans.length === 1 ? '' : 's'})</span></h2>
     <ul class="tl">${scans.map(x => `<li><a href="#" class="x2" data-rm="${x.i}" title="Remove this entry">×</a><div class="when">${fullTime(x.at)} · ${since(x.at)}</div>
       <div>${x.treatment ? `<span class="pill p-new">🧺 ${esc(x.treatment)}</span>` : stagePill(x.stage)} ${x.location && !x.treatment ? '📍 ' + esc(x.location) : ''}</div>${x.note ? `<div class="muted" style="font-size:12.5px">${esc(x.note)}</div>` : ''}</li>`).join('')}</ul>`,
@@ -1284,11 +1311,13 @@ function openTag(code) {
         toast(`✓ ${t.code} — ${treat}: ${f.recovered.value} of ${f.flagged.value} recovered`);
       } else {
         await rpc('scan_barcode_tag', {p_code: t.code, p_stage: stage, p_location: f.loc.value, p_note: f.note.value});
-        toast(`✓ ${t.code} → ${stage}${f.loc.value ? ' · ' + f.loc.value : ''}`);
+        const moved = f.withPieces?.checked ? await rpc('move_batch_pieces', {p_batch: t.code, p_stage: stage, p_location: f.loc.value, p_note: f.note.value}) : 0;
+        toast(`✓ ${t.code} → ${stage}${f.loc.value ? ' · ' + f.loc.value : ''}${moved ? ` (+${moved} pieces)` : ''}`);
       }
     }, '✓ Save', 'tag');
   barcodeSvg(t.code, {height: 54}).then(svg => { const el = f.querySelector('#tagBc'); if (el) el.innerHTML = svg; }).catch(() => {});
   f.querySelectorAll('[data-stage]').forEach(b => b.onclick = () => { stage = b.dataset.stage; f.querySelectorAll('[data-stage]').forEach(x => x.classList.toggle('ghost', x !== b)); });
+  f.querySelectorAll('[data-piece]').forEach(b => b.onclick = () => openTag(b.dataset.piece));
   f.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
     mode = b.dataset.mode;
     f.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x === b));
@@ -1319,11 +1348,63 @@ function openTag(code) {
   btns.insertAdjacentHTML('afterbegin', `<button type="button" class="btn red" id="delTag">Delete</button><button type="button" class="btn ghost" id="printTag">🖨 Print</button>`);
   f.querySelector('#printTag').onclick = () => ACT.printTags(t.code);
   f.querySelector('#delTag').onclick = async () => {
-    if (!confirm(`Delete ${t.code} and its history? This can't be undone.`)) return;
+    if (!confirm(`Delete ${t.code}${pieces.length ? ` and its ${pieces.length} piece barcodes` : ''} and the history? This can't be undone.`)) return;
     try { await rpc('delete_barcode_tag', {p_code: t.code}); tagPicked.delete(t.code); $('#modal').hidden = true; toast(`${t.code} deleted`); refresh(); }
     catch (e) { f.querySelector('.err').textContent = e.message; }
   };
   f.querySelector('[type=submit]').focus();   // a handheld scanner can confirm with its Enter key
+}
+
+// A single piece: shows its batch, lets you update just this piece (the batch follows)
+function openPiece(t) {
+  const b = tagBy(t.batch_code) || {};
+  const stages = S.settings.tagStages, locs = S.settings.tagLocations;
+  const allStages = stages.includes(t.stage) ? stages : [...stages, t.stage];
+  let stage = t.stage, cond = t.condition;
+  const sibs = piecesOf(t.batch_code), no = t.code.slice(t.batch_code.length + 1);
+  const scans = (t.scans || []).map((x, i) => ({...x, i})).reverse();
+  const f = modal(`<span class="mono">${esc(t.code)}</span>`, `
+    <div class="batchlink"><div><span class="muted" style="font-size:12px">Belongs to batch</span><div class="mono">${esc(t.batch_code)}</div>
+        <div style="font-size:13px"><b>${esc(b.brand || t.brand || '')}</b> · ${esc(b.product_type || t.product_type || '')} · ${esc(b.supplier || t.supplier || '')}${(b.lot_date || t.lot_date) ? ' · ' + dmy(b.lot_date || t.lot_date) : ''}</div></div>
+      <button type="button" class="btn ghost sm" id="openBatch">Open batch →</button></div>
+    <div class="tagtop"><div class="tagbc" id="tagBc"><span class="muted">…</span></div>
+      <div><b style="font-size:16px">Piece ${esc(no)} of ${sibs.length}</b>
+        <div style="margin-top:6px">Started as ${condPill(t.original_condition)} · now ${condPill(t.condition)}</div></div></div>
+    <div class="tagnow"><div><span class="muted">Now:</span> ${stagePill(t.stage)} ${t.location ? `<b>📍 ${esc(t.location)}</b>` : ''}</div>
+      <div class="muted" style="margin-top:4px">Last scanned <b style="font-size:13px;color:var(--ink)">${since(t.last_scan_at)}</b> — ${fullTime(t.last_scan_at)}${t.note ? ` · “${esc(t.note)}”` : ''}</div></div>
+    <h2 style="margin:4px 0 6px">Update this piece</h2>
+    <label style="margin:0">Condition</label>
+    <div class="brandbtns" style="margin-top:6px">${COND.map(c => `<button type="button" class="btn ${c === cond ? '' : 'ghost'} sm" data-cond="${c}">${c}</button>`).join('')}</div>
+    <label style="margin:0">Step</label>
+    <div class="brandbtns" style="margin-top:6px">${allStages.map(st => `<button type="button" class="btn ${st === stage ? '' : 'ghost'} sm" data-stage="${esc(st)}">${esc(st)}</button>`).join('')}</div>
+    <div class="row"><label>Where is it now?<select name="loc">${[...new Set([t.location, ...locs].filter(Boolean))].map(l => `<option ${l === t.location ? 'selected' : ''}>${esc(l)}</option>`).join('')}<option value="">— other / not set —</option></select></label>
+      <label>Note <span style="font-weight:400">(optional)</span><input name="note" data-nokeep placeholder="e.g. stain gone after wash"></label></div>
+    <h2 style="margin:6px 0 10px">History <span class="muted" style="font-weight:400">(${scans.length})</span></h2>
+    <ul class="tl">${scans.map(x => `<li><a href="#" class="x2" data-rm="${x.i}" title="Remove this entry">×</a><div class="when">${fullTime(x.at)} · ${since(x.at)}</div>
+      <div>${stagePill(x.stage)} ${condPill(x.condition)} ${x.location ? '📍 ' + esc(x.location) : ''}</div>${x.note ? `<div class="muted" style="font-size:12.5px">${esc(x.note)}</div>` : ''}</li>`).join('')}</ul>`,
+    async f => {
+      await rpc('update_piece_tag', {p_code: t.code, p_condition: cond, p_stage: stage, p_location: f.loc.value, p_note: f.note.value});
+      toast(`✓ ${t.code}${cond !== t.condition ? ` · ${t.condition} → ${cond}` : ''}${stage !== t.stage ? ` · ${stage}` : ''} — batch updated`);
+    }, '✓ Save piece', 'tag');
+  barcodeSvg(t.code, {height: 54}).then(svg => { const el = f.querySelector('#tagBc'); if (el) el.innerHTML = svg; }).catch(() => {});
+  f.querySelector('#openBatch').onclick = () => openTag(t.batch_code);
+  f.querySelectorAll('[data-cond]').forEach(x => x.onclick = () => { cond = x.dataset.cond; f.querySelectorAll('[data-cond]').forEach(y => y.classList.toggle('ghost', y !== x)); });
+  f.querySelectorAll('[data-stage]').forEach(x => x.onclick = () => { stage = x.dataset.stage; f.querySelectorAll('[data-stage]').forEach(y => y.classList.toggle('ghost', y !== x)); });
+  f.querySelectorAll('[data-rm]').forEach(a => a.onclick = async e => {
+    e.preventDefault();
+    if (!confirm('Remove this entry from the history?')) return;
+    try { await rpc('remove_barcode_tag_scan', {p_code: t.code, p_index: +a.dataset.rm}); await refresh(); openTag(t.code); }
+    catch (err) { f.querySelector('.err').textContent = err.message; }
+  });
+  const btns = f.querySelector('.foot .btns');
+  btns.insertAdjacentHTML('afterbegin', `<button type="button" class="btn red" id="delTag">Delete</button><button type="button" class="btn ghost" id="printTag">🖨 Print</button>`);
+  f.querySelector('#printTag').onclick = () => ACT.printTags(t.code);
+  f.querySelector('#delTag').onclick = async () => {
+    if (!confirm(`Delete piece ${t.code}? This can't be undone.`)) return;
+    try { await rpc('delete_barcode_tag', {p_code: t.code}); $('#modal').hidden = true; toast(`${t.code} deleted`); refresh(); }
+    catch (e) { f.querySelector('.err').textContent = e.message; }
+  };
+  f.querySelector('[type=submit]').focus();
 }
 
 // Label = just the barcode, with its item code printed underneath
@@ -1343,6 +1424,21 @@ async function printLabels(codes, size) {
       <script>setTimeout(() => print(), 350)<\/script>`);
     w.document.close();
   } catch (e) { w.close(); toast(e.message); }
+}
+
+function printChooser(batches, pieces) {
+  const opts = [batches.length && pieces.length ? ['all', `Batch + all pieces (${batches.length + pieces.length} labels)`] : null,
+    batches.length ? ['batch', `Batch label only (${batches.length})`] : null, pieces.length ? ['pieces', `Piece labels only (${pieces.length})`] : null].filter(Boolean);
+  const f = modal('Print barcodes', `${opts.length > 1 ? `<label>What to print<select name="what">${opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>` : `<p style="margin-top:0">${opts[0][1]}</p>`}
+    <p>Which labels are you printing on?</p>
+    <div class="btns"><button type="button" class="btn" data-size="thermal">🏷 Sticker printer (50 × 30 mm)</button><button type="button" class="btn ghost" data-size="a4">📄 A4 sticker sheet (3 × 8)</button></div>
+    <p class="muted" style="margin-bottom:0">Any normal printer works with A4 sticker paper. In the print window, set scale to 100% / “Actual size”.</p>`, () => null, 'Close');
+  f.querySelector('[type=submit]').hidden = true;
+  f.querySelectorAll('[data-size]').forEach(b => b.onclick = () => {
+    const what = f.what ? f.what.value : opts[0][0];
+    const codes = what === 'all' ? [...batches, ...pieces] : what === 'batch' ? batches : pieces;
+    $('#modal').hidden = true; printLabels(codes, b.dataset.size);
+  });
 }
 
 let cam = null;
@@ -1682,35 +1778,37 @@ const ACT = {
     if (!S.tagsReady) { toast('Run the barcode database steps (007 and 008) in Supabase first'); return; }
     const stages = S.settings.tagStages, locs = S.settings.tagLocations;
     let manual = false;
-    const f = modal('New barcode', `${lotFieldsHtml()}
-      <label class="codeprev">Item code <span style="font-weight:400">— made from the details above, you can change it</span><input name="code" class="mono" autocomplete="off" required></label>
+    const f = modal('New batch', `${lotFieldsHtml()}
+      <label class="codeprev">Batch code <span style="font-weight:400">— made from the details above, you can change it</span><input name="code" class="mono" autocomplete="off" required></label>
+      <label class="muted" style="display:flex;gap:8px;align-items:center;font-weight:500;margin:-2px 0 12px"><input type="checkbox" name="makePieces" checked style="width:auto;margin:0"> <span>Also make a barcode for every piece (<b id="pieceN">0</b>): <span class="mono" id="piecePrev"></span></span></label>
       <div class="row"><label>Starting step<select name="stage">${stages.map(st => `<option>${esc(st)}</option>`).join('')}</select></label>
         <label>Where is it now?<select name="loc">${locs.map(l => `<option>${esc(l)}</option>`).join('')}<option value="">— not set —</option></select></label></div>`,
       async f => {
         const v = lotVals(f);
         if (!v.brand || !v.type || !v.supplier) return 'Fill in brand, product type and supplier';
         if (!v.total) return 'Enter at least one piece count';
-        const code = await rpc('create_lot_tag', {p_code: f.code.value, ...lotArgs(v), p_stage: f.stage.value, p_location: f.loc.value});
-        toast(`✓ Saved ${code}${code !== normCode(f.code.value) ? ' (that code was taken, so a number was added)' : ''}`, 4000);
-        setTimeout(() => ACT.printTags(code), 60);
-      }, 'Save & print barcode');
+        if (f.makePieces.checked && v.total > 2000) return 'Up to 2000 piece barcodes per batch';
+        const r = await rpc('create_lot_tag', {p_code: f.code.value, ...lotArgs(v), p_stage: f.stage.value, p_location: f.loc.value, p_make_pieces: f.makePieces.checked});
+        toast(`✓ Saved batch ${r.batch}${r.pieces.length ? ` + ${r.pieces.length} piece barcodes` : ''}${r.batch !== normCode(f.code.value) ? ' (that code was taken, so a number was added)' : ''}`, 4500);
+        setTimeout(() => printChooser([r.batch], r.pieces), 60);
+      }, 'Save & print barcodes');
     const upd = e => {
       if (e?.target?.name === 'code') { manual = !!f.code.value.trim(); return; }
       const v = lotVals(f);
       f.querySelector('#lotTotal').textContent = v.total;
       if (!manual) f.code.value = lotCode(v);
+      const w = Math.max(2, String(v.total).length), c = normCode(f.code.value);
+      f.querySelector('#pieceN').textContent = v.total;
+      f.querySelector('#piecePrev').textContent = v.total ? `${c}-${'1'.padStart(w, '0')} … ${c}-${String(v.total).padStart(w, '0')}` : '';
     };
     f.addEventListener('input', upd); f.addEventListener('change', upd); upd();
   },
   printTags(codes) {
     const list = (codes ? String(codes).split(',') : [...tagPicked]).filter(Boolean);
-    if (!list.length) return toast('Tick the labels you want to print first');
-    const f = modal(`Print ${list.length} label${list.length > 1 ? 's' : ''}`, `<p class="muted" style="margin-top:0">${list.length <= 6 ? list.map(c => `<span class="mono">${c}</span>`).join(', ') : `${list[0]} … ${list[list.length - 1]}`}</p>
-      <p>Which labels are you printing on?</p>
-      <div class="btns"><button type="button" class="btn" data-size="thermal">🏷 Sticker printer (50 × 30 mm)</button><button type="button" class="btn ghost" data-size="a4">📄 A4 sticker sheet (3 × 8)</button></div>
-      <p class="muted" style="margin-bottom:0">Any normal printer works with A4 sticker paper. In the print window, set scale to 100% / “Actual size”.</p>`, () => null, 'Close');
-    f.querySelector('[type=submit]').hidden = true;
-    f.querySelectorAll('[data-size]').forEach(b => b.onclick = () => { $('#modal').hidden = true; printLabels(list, b.dataset.size); });
+    if (!list.length) return toast('Tick the batches you want to print first');
+    const batches = list.filter(c => !isPiece(tagBy(c) || {}));
+    const pieces = [...list.filter(c => isPiece(tagBy(c) || {})), ...batches.flatMap(c => piecesOf(c).map(x => x.code))];
+    printChooser(batches, pieces);
   },
   async scanCamera() {
     const f = modal('Scan with camera', `<div id="qrReader"></div><p class="muted" style="margin-bottom:0">Point the camera at a label's barcode. Works best on a phone, in good light, held about 15 cm away.</p>`, () => null, 'Close');
@@ -1776,8 +1874,8 @@ const ACT = {
       bales: [['ID', 'Date', 'Supplier', 'Type', 'Kg', 'Cost', 'Status', 'Pieces'], S.bales.map(b => [b.id, b.date, b.supplier, b.type, b.weightKg, b.cost, b.status, sum(Object.values(b.yield), q => q)])],
       inventory: [['Category', 'Grade', 'Qty', 'Min', 'Price', 'Value'], Object.entries(S.stock).map(([k, s]) => [...k.split('|'), s.qty, s.min, s.price, s.qty * s.price])],
       orders: [['ID', 'Date', 'Wholesaler', 'City', 'Items', 'Pieces', 'Total', 'Paid', 'Due', 'Status', 'Courier', 'Tracking'], S.orders.map(o => [o.id, o.date, cust(o.customerId).name, cust(o.customerId).city, o.lines.map(l => `${label(l.key)} x${l.qty}`).join('; '), sum(o.lines, l => l.qty), total(o), o.paid, due(o), o.status, o.courier || '', o.tracking || ''])],
-      tags: [['Item code', 'Brand', 'Product type', 'Supplier', 'Date', 'A', 'Washing', 'Mending', 'Damaged', 'Total', 'Washing flagged', 'Washing recovered', 'Mending flagged', 'Mending recovered', 'Step', 'Where', 'Last scan', 'Updates'],
-        S.tags.map(t => [t.code, t.brand || '', t.product_type || t.label || '', t.supplier || '', dmy(t.lot_date), t.count_a || 0, t.count_washing || 0, t.count_mending || 0, t.count_damaged || 0, isLot(t) ? lotTotal(t) : t.qty ?? '',
+      tags: [['Code', 'Type', 'Batch', 'Condition now', 'Started as', 'Brand', 'Product type', 'Supplier', 'Date', 'A', 'Washing', 'Mending', 'Damaged', 'Total', 'Washing flagged', 'Washing recovered', 'Mending flagged', 'Mending recovered', 'Step', 'Where', 'Last scan', 'Updates'],
+        S.tags.map(t => [t.code, isPiece(t) ? 'Piece' : 'Batch', t.batch_code || '', t.condition || '', t.original_condition || '', t.brand || '', t.product_type || t.label || '', t.supplier || '', dmy(t.lot_date), t.count_a || 0, t.count_washing || 0, t.count_mending || 0, t.count_damaged || 0, isLot(t) ? lotTotal(t) : t.qty ?? '',
           t.washing_flagged ?? '', t.washing_recovered ?? '', t.mending_flagged ?? '', t.mending_recovered ?? '', t.stage, t.location, fullTime(t.last_scan_at), (t.scans || []).length])],
       customers: [['ID', 'Name', 'City', 'Phone', 'Credit limit', 'Owes'], S.customers.map(c => [c.id, c.name, c.city, c.phone, c.limit, custDue(c.id)])],
     }[what];
