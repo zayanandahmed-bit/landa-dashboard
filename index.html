@@ -255,6 +255,19 @@ body.revealing{--rise0:280ms}
 .scanbox p{margin:8px 0 0;font-size:12.5px}
 .tblhead{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}
 .tblhead input{padding:8px 12px;border:1px solid var(--line);border-radius:10px;min-width:240px}
+.row4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.lotsum{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:2px 0 12px}
+.lotsum b{font-size:18px}
+.codeprev input{font-size:17px!important;font-weight:700;letter-spacing:.04em;color:var(--brand)!important;border:2px solid rgba(13,148,136,.35)!important}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:13px}
+.facts span{display:block;color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.counts{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0}
+.counts i{font-style:normal;border-radius:9px;padding:3px 9px;font-size:12.5px;font-weight:700;background:var(--card2);border:1px solid var(--line)}
+.counts .cA{background:var(--okbg);color:var(--ok);border-color:transparent}.counts .cW{background:var(--infobg);color:var(--info);border-color:transparent}
+.counts .cM{background:var(--warnbg);color:var(--warn);border-color:transparent}.counts .cD{background:var(--dangerbg);color:var(--danger);border-color:transparent}
+.seg{display:flex;gap:6px;background:var(--card2);border:1px solid var(--line);padding:4px;border-radius:13px;margin:6px 0 12px}
+.seg button{flex:1;border:0;background:transparent;border-radius:10px;padding:9px;font:inherit;font-weight:600;color:var(--mute);cursor:pointer;transition:all .2s}
+.seg button.on{background:#fff;color:var(--brand);box-shadow:0 2px 10px -2px rgba(13,148,136,.4)}
 .tagtop{display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:center;margin-bottom:14px}
 .tagbc{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:84px;display:grid;place-items:center}
 .tagbc svg{width:100%;height:auto}
@@ -269,7 +282,7 @@ body.revealing{--rise0:280ms}
 .tl .x2{float:right;color:var(--danger);text-decoration:none;font-weight:700;padding:0 4px}
 #qrReader{border-radius:14px;overflow:hidden;background:#000;min-height:220px}
 #qrReader video{border-radius:14px}
-@media(max-width:600px){.tagtop{grid-template-columns:1fr}}
+@media(max-width:600px){.tagtop{grid-template-columns:1fr}.row4{grid-template-columns:1fr 1fr}}
 @media(max-width:860px){
   body{flex-direction:column}
   aside{width:auto;height:auto;position:static;flex-direction:row;overflow-x:auto;padding:10px;gap:4px;border-right:0}
@@ -1053,7 +1066,7 @@ function aiContext() {
     totals: {stockPieces: sum(Object.values(S.stock), s => s.qty), stockValueAtSellingPrice: r(sum(Object.values(S.stock), s => s.qty * s.price)), moneyToCollect: r(sum(S.orders, due))},
     stock, salesLast90DaysByItem: sales90, monthlySales: monthly, bales, suppliers, customers, recentOrders: orders, brandsSorted: brands,
     activeAlerts: alerts().map(a => `[${a.type}] ${a.text}`),
-    barcodeLabels: S.tagsReady ? {total: S.tags.length, byStep: Object.fromEntries(S.settings.tagStages.map(st => [st, S.tags.filter(t => t.stage === st).length])), latest: S.tags.slice(0, 30).map(t => ({code: t.code, label: t.label, step: t.stage, where: t.location, lastScan: t.last_scan_at}))} : null});
+    barcodeLabels: S.tagsReady ? {total: S.tags.length, byStep: Object.fromEntries(S.settings.tagStages.map(st => [st, S.tags.filter(t => t.stage === st).length])), latest: S.tags.slice(0, 40).map(t => ({code: t.code, brand: t.brand, productType: t.product_type || t.label, supplier: t.supplier, date: t.lot_date, a: t.count_a, washing: t.count_washing, mending: t.count_mending, damaged: t.count_damaged, washingRecovered: t.washing_recovered, mendingRecovered: t.mending_recovered, step: t.stage, where: t.location, lastScan: t.last_scan_at}))} : null});
 }
 function aiCard() {
   const s = S.settings, a = aiState && typeof aiState === 'object' && !aiState.error ? aiState : null;
@@ -1131,41 +1144,62 @@ function normCode(raw) {
   const c = String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
   if (/^\d{1,6}$/.test(c)) return 'LND-' + c.padStart(6, '0');
   const m = c.match(/^LND-?(\d{1,6})$/);
-  return m ? 'LND-' + m[1].padStart(6, '0') : c;
+  return m ? 'LND-' + m[1].padStart(6, '0') : c.replace(/[^A-Z0-9-]/g, '');
 }
 function stagePill(st) {
   const stages = S.settings.tagStages, i = stages.indexOf(st);
   const cls = i < 0 ? 'p-cancelled' : i === stages.length - 1 ? 'p-delivered' : ['p-received', 'p-sorting', 'p-new', 'p-packed', 'p-dispatched'][i % 5];
   return `<span class="pill ${cls}">${esc(st)}</span>`;
 }
-const tagDetails = t => [t.category && t.grade ? `${t.category} · ${t.grade}` : t.category || t.grade, t.qty != null ? `${num(t.qty)} pcs` : '', t.brand].filter(Boolean).map(esc).join(' · ');
-const tagWhat = t => `${t.label ? esc(t.label) : `<span class="muted">${TAG_KINDS[t.kind] || t.kind}</span>`}<div class="muted" style="font-size:12px">${TAG_KINDS[t.kind] || t.kind}${t.ref_id ? ' · ' + esc(t.ref_id) : ''}</div>`;
+// The readable item code, built like the owner's sheet:
+// supplier initials + brand + product type + date (DDMMYYYY) + W<washing> - <total>
+// e.g. Abdul Kareem · Patagonia · Fleece Jackets · 2 Oct 2026 · W30 · 64 pcs -> AKPFJ02102026W30-64
+function initialsOf(text, single) {
+  const w = String(text || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+  if (!w.length) return '';
+  return w.length === 1 ? w[0].slice(0, single) : w.map(x => x[0]).join('').slice(0, 3);
+}
+function lotCode(v) {
+  const [y, m, d] = String(v.date || '').split('-');
+  return initialsOf(v.supplier, 2) + initialsOf(v.brand, 1) + initialsOf(v.type, 2) + (y ? d + m + y : '') + 'W' + (v.w || 0) + '-' + v.total;
+}
+const isLot = t => !!(t.product_type || t.supplier);
+const lotTotal = t => (t.count_a || 0) + (t.count_washing || 0) + (t.count_mending || 0) + (t.count_damaged || 0);
+const dmy = d => d ? d.split('-').reverse().join('/') : '';
+const countsHtml = t => `<div class="counts"><i class="cA">A ${t.count_a || 0}</i><i class="cW">Washing ${t.count_washing || 0}</i><i class="cM">Mending ${t.count_mending || 0}</i><i class="cD">Damaged ${t.count_damaged || 0}</i><i>Total ${lotTotal(t)}</i></div>`;
+const treatText = t => [t.washing_flagged != null ? `Washing ${t.washing_recovered}/${t.washing_flagged} recovered` : '', t.mending_flagged != null ? `Mending ${t.mending_recovered}/${t.mending_flagged} recovered` : ''].filter(Boolean).join(' · ');
+const tagDetails = t => isLot(t)
+  ? `A ${t.count_a || 0} · W ${t.count_washing || 0} · M ${t.count_mending || 0} · D ${t.count_damaged || 0} = <b>${lotTotal(t)}</b>${treatText(t) ? `<div class="muted">${esc(treatText(t))}</div>` : ''}`
+  : [t.category && t.grade ? `${t.category} · ${t.grade}` : t.category || t.grade, t.qty != null ? `${num(t.qty)} pcs` : '', t.brand].filter(Boolean).map(esc).join(' · ');
+const tagWhat = t => isLot(t)
+  ? `<b>${esc(t.brand || '')}</b> · ${esc(t.product_type || '')}<div class="muted" style="font-size:12px">${esc(t.supplier || '')}${t.lot_date ? ' · ' + dmy(t.lot_date) : ''}</div>`
+  : `${t.label ? esc(t.label) : `<span class="muted">${TAG_KINDS[t.kind] || t.kind}</span>`}<div class="muted" style="font-size:12px">${TAG_KINDS[t.kind] || t.kind}${t.ref_id ? ' · ' + esc(t.ref_id) : ''}</div>`;
 const fullTime = ts => new Date(ts).toLocaleString('en-GB', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
 let tagPicked = new Set();
 
 PAGES.tracking = filter => {
-  const top = head('Barcodes', 'Print a label, stick it on, scan it at every step — always know where everything is',
-    `<button class="btn ghost" data-act="csv" data-id="tags">Export CSV</button><button class="btn ghost" data-act="scanCamera">📷 Scan with camera</button><button class="btn" data-act="newTags">+ Create barcodes</button>`);
-  if (!S.tagsReady) return top + `<div class="card"><p class="low" style="margin:0">One database step: run <code>supabase/007_barcode_tracking.sql</code> in the Supabase SQL editor, then refresh.</p></div>`;
+  const top = head('Barcodes', 'Fill in the lot, print its barcode, then scan it at every step — always know where everything is',
+    `<button class="btn ghost" data-act="csv" data-id="tags">Export CSV</button><button class="btn ghost" data-act="scanCamera">📷 Scan with camera</button><button class="btn" data-act="newTags">+ New barcode</button>`);
+  if (!S.tagsReady) return top + `<div class="card"><p class="low" style="margin:0">One database step: run <code>supabase/007_barcode_tracking.sql</code> and <code>supabase/008_barcode_lots.sql</code> in the Supabase SQL editor, then refresh.</p></div>`;
   const f = filter ? decodeURIComponent(filter) : '';
   const stages = S.settings.tagStages;
   const list = S.tags.filter(t => !f || t.stage === f);
   const known = new Set(stages), extra = [...new Set(S.tags.map(t => t.stage).filter(x => !known.has(x)))];
   return top + `
-  <form class="card scanbox" id="scanForm"><div class="scanrow">${BC_ICON}<input name="code" data-nokeep autocomplete="off" placeholder="Scan a label, or type its code (e.g. 12 or LND-000012) and press Enter"><button class="btn">Open</button></div>
-    <p class="muted">Handheld USB / Bluetooth barcode scanners work on any page of the app — just scan and the label opens.</p></form>
+  <form class="card scanbox" id="scanForm"><div class="scanrow">${BC_ICON}<input name="code" data-nokeep autocomplete="off" placeholder="Scan a barcode, or type its item code and press Enter"><button class="btn">Open</button></div>
+    <p class="muted">Handheld USB / Bluetooth barcode scanners work on any page of the app — just scan and the item opens.</p></form>
   <div class="tabs"><a href="#tracking" class="${!f ? 'on' : ''}">All (${S.tags.length})</a>${[...stages, ...extra].map(st => `<a href="#tracking/${encodeURIComponent(st)}" class="${f === st ? 'on' : ''}">${esc(st)} (${S.tags.filter(t => t.stage === st).length})</a>`).join('')}</div>
   <div class="card tbl">
-    <div class="tblhead"><input id="tagSearch" data-nokeep placeholder="Search code, label, brand, place…"><div class="btns"><span class="muted" id="pickCount"></span><button class="btn ghost sm" data-act="printTags" data-id="">🖨 Print selected</button></div></div>
-    <table><tr><th style="width:30px"><input type="checkbox" id="pickAll" data-nokeep></th><th>Code</th><th>What</th><th>Details</th><th>Step</th><th>Where</th><th>Last scan</th><th class="n">Scans</th><th></th></tr>
-    ${list.map(t => `<tr data-search="${esc([t.code, t.label, t.ref_id, t.category, t.grade, t.brand, t.stage, t.location, t.note].join(' ').toLowerCase())}">
-      <td><input type="checkbox" class="tagpick" value="${t.code}" data-nokeep ${tagPicked.has(t.code) ? 'checked' : ''}></td>
-      <td><a href="#" data-act="openTag" data-id="${t.code}" class="mono" style="font-weight:700;color:var(--brand);text-decoration:none">${t.code}</a></td>
-      <td>${tagWhat(t)}</td><td style="font-size:12.5px">${tagDetails(t) || '<span class="muted">—</span>'}</td>
+    <div class="tblhead"><input id="tagSearch" data-nokeep placeholder="Search code, brand, supplier, place…"><div class="btns"><span class="muted" id="pickCount"></span><button class="btn ghost sm" data-act="printTags" data-id="">🖨 Print selected</button></div></div>
+    <table><tr><th style="width:30px"><input type="checkbox" id="pickAll" data-nokeep></th><th>Item code</th><th>Item</th><th>Pieces</th><th>Step</th><th>Where</th><th>Last scan</th><th class="n">Scans</th><th></th></tr>
+    ${list.map(t => `<tr data-search="${esc([t.code, t.label, t.brand, t.product_type, t.supplier, t.ref_id, t.category, t.stage, t.location, t.note].join(' ').toLowerCase())}">
+      <td><input type="checkbox" class="tagpick" value="${esc(t.code)}" data-nokeep ${tagPicked.has(t.code) ? 'checked' : ''}></td>
+      <td><a href="#" data-act="openTag" data-id="${esc(t.code)}" class="mono" style="font-weight:700;color:var(--brand);text-decoration:none">${esc(t.code)}</a></td>
+      <td>${tagWhat(t)}</td><td style="font-size:12.5px;white-space:normal;min-width:160px">${tagDetails(t) || '<span class="muted">—</span>'}</td>
       <td>${stagePill(t.stage)}</td><td>${t.location ? '📍 ' + esc(t.location) : '<span class="muted">—</span>'}</td>
       <td>${since(t.last_scan_at)}<div class="muted" style="font-size:12px">${fullTime(t.last_scan_at)}</div></td><td class="n">${(t.scans || []).length}</td>
-      <td><div class="btns"><button class="btn sm" data-act="openTag" data-id="${t.code}">Open</button><button class="btn ghost sm" data-act="printTags" data-id="${t.code}">🖨</button></div></td></tr>`).join('')
-      || `<tr><td colspan="9" class="empty">${S.tags.length ? 'Nothing at this step.' : 'No labels yet — press “+ Create barcodes” to make your first ones.'}</td></tr>`}
+      <td><div class="btns"><button class="btn sm" data-act="openTag" data-id="${esc(t.code)}">Open</button><button class="btn ghost sm" data-act="printTags" data-id="${esc(t.code)}">🖨</button></div></td></tr>`).join('')
+      || `<tr><td colspan="9" class="empty">${S.tags.length ? 'Nothing at this step.' : 'No barcodes yet — press “+ New barcode” to make your first one.'}</td></tr>`}
     </table></div>`;
 };
 AFTER.tracking = () => {
@@ -1185,74 +1219,96 @@ async function openTagByCode(raw) {
   const code = normCode(raw);
   if (!S?.tagsReady) return toast('Barcode tracking needs its database step first — see the Barcodes tab');
   if (!tagBy(code)) await refresh();   // maybe it was just made on another device
-  if (!tagBy(code)) return toast(`No label found with code ${code}`, 4000);
+  if (!tagBy(code)) return toast(`No item found with code ${code}`, 4000);
   openTag(code);
 }
-function refOptions(kind, sel) {
-  const opts = kind === 'bale' ? S.bales.map(b => [b.id, `${b.id} · ${b.type} · ${b.supplier}`])
-    : kind === 'order' ? S.orders.map(o => [o.id, `${o.id} · ${cust(o.customerId).name} · ${o.date}`]) : [];
-  return `<option value="">— none —</option>${opts.map(([v, t]) => `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(t)}</option>`).join('')}`;
+
+// The same fields as the owner's sheet, used for "New barcode" and "Edit details"
+function lotFieldsHtml(t = {}) {
+  const sups = [...new Set([...S.bales.map(b => b.supplier), ...S.tags.map(x => x.supplier)].filter(Boolean))];
+  const types = [...new Set([...S.categories, ...S.tags.map(x => x.product_type)].filter(Boolean))];
+  const n = (name, v) => `<input type="number" name="${name}" min="0" value="${v ?? ''}" placeholder="0">`;
+  return `<div class="row"><label>Brand<input name="brand" list="lotBrands" value="${esc(t.brand || '')}" required placeholder="e.g. Patagonia"></label>
+      <label>Product type<input name="ptype" list="lotTypes" value="${esc(t.product_type || '')}" required placeholder="e.g. Fleece Jackets"></label></div>
+    <div class="row"><label>Date<input type="date" name="ldate" value="${t.lot_date || today()}"></label>
+      <label>Supplier<input name="supplier" list="lotSups" value="${esc(t.supplier || '')}" required placeholder="e.g. Abdul Kareem"></label></div>
+    <div class="row4"><label>A (good)${n('ca', t.count_a)}</label><label>Washing${n('cw', t.count_washing)}</label><label>Mending${n('cm', t.count_mending)}</label><label>Damaged${n('cd', t.count_damaged)}</label></div>
+    <div class="lotsum"><span class="muted">Total pieces</span><b id="lotTotal">0</b></div>
+    <datalist id="lotBrands">${brandList().map(b => `<option value="${esc(b)}">`).join('')}</datalist>
+    <datalist id="lotTypes">${types.map(x => `<option value="${esc(x)}">`).join('')}</datalist>
+    <datalist id="lotSups">${sups.map(x => `<option value="${esc(x)}">`).join('')}</datalist>`;
 }
-function tagFieldsHtml(t = {}) {
-  const k = t.kind || 'bundle';
-  return `<div class="row"><label>What is it?<select name="kind">${Object.entries(TAG_KINDS).map(([v, l]) => `<option value="${v}" ${v === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-      <label id="refWrap" ${k === 'bale' || k === 'order' ? '' : 'hidden'}>Linked ${k === 'order' ? 'order' : 'bale'}<select name="ref">${refOptions(k, t.ref_id)}</select></label></div>
-    <label>Label / description<input name="label" value="${esc(t.label || '')}" placeholder="e.g. Levi's jeans A-grade, 50 pcs"></label>
-    <div class="row"><label>Category<select name="category"><option value="">—</option>${S.categories.map(c => `<option ${c === t.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
-      <label>Grade<select name="grade"><option value="">—</option>${GRADES.map(g => `<option ${g === t.grade ? 'selected' : ''}>${g}</option>`).join('')}</select></label></div>
-    <div class="row"><label>Pieces<input type="number" name="qty" min="0" value="${t.qty ?? ''}"></label>
-      <label>Brand<input name="brand" list="tagBrands" value="${esc(t.brand || '')}"></label></div>
-    <datalist id="tagBrands">${brandList().map(b => `<option value="${esc(b)}">`).join('')}</datalist>`;
-}
-function wireTagFields(f) {
-  f.kind.addEventListener('change', () => {
-    const k = f.kind.value, w = f.querySelector('#refWrap');
-    w.hidden = !(k === 'bale' || k === 'order');
-    w.firstChild.textContent = `Linked ${k === 'order' ? 'order' : 'bale'}`;
-    f.ref.innerHTML = refOptions(k, '');
-  });
-  f.ref.addEventListener('change', () => {   // fill the description from what it's linked to
-    if (f.label.value.trim() || !f.ref.value) return;
-    const b = S.bales.find(x => x.id === f.ref.value), o = S.orders.find(x => x.id === f.ref.value);
-    f.label.value = b ? `${b.type} · ${b.supplier}` : o ? `${o.id} for ${cust(o.customerId).name}` : '';
-  });
-}
-const tagArgs = f => ({p_label: f.label.value, p_kind: f.kind.value, p_ref: f.kind.value === 'bale' || f.kind.value === 'order' ? f.ref.value : '',
-  p_category: f.category.value, p_grade: f.grade.value, p_qty: f.qty.value === '' ? null : Math.max(0, Math.round(+f.qty.value)), p_brand: canonBrand(f.brand.value)});
+const lotVals = f => {
+  const c = k => Math.max(0, Math.round(+f[k].value || 0));
+  const v = {brand: canonBrand(f.brand.value), type: f.ptype.value.trim(), date: f.ldate.value, supplier: f.supplier.value.trim(), a: c('ca'), w: c('cw'), m: c('cm'), d: c('cd')};
+  v.total = v.a + v.w + v.m + v.d;
+  return v;
+};
+const lotArgs = v => ({p_brand: v.brand, p_type: v.type, p_date: v.date || null, p_supplier: v.supplier, p_a: v.a, p_washing: v.w, p_mending: v.m, p_damaged: v.d});
 
 function openTag(code) {
   stopCam();
   const t = tagBy(code);
-  if (!t) return toast(`No label found with code ${code}`);
+  if (!t) return toast(`No item found with code ${code}`);
+  const lot = isLot(t);
   const stages = S.settings.tagStages, locs = S.settings.tagLocations;
   const allStages = stages.includes(t.stage) ? stages : [...stages, t.stage];
   let stage = stages[Math.min(stages.indexOf(t.stage) + 1, stages.length - 1)] || stages[0];   // most scans move it one step on
+  let mode = 'move', treat = (t.count_washing || 0) || t.washing_flagged != null || !(t.count_mending || 0) ? 'washing' : 'mending';
+  const flaggedFor = tr => t[tr + '_flagged'] ?? t['count_' + tr] ?? 0;
   const scans = (t.scans || []).map((x, i) => ({...x, i})).reverse();
-  const f = modal(`<span class="mono">${t.code}</span>`, `
+  const f = modal(`<span class="mono">${esc(t.code)}</span>`, `
     <div class="tagtop"><div class="tagbc" id="tagBc"><span class="muted">…</span></div>
-      <div><b style="font-size:16px">${t.label ? esc(t.label) : TAG_KINDS[t.kind]}</b><div class="muted">${TAG_KINDS[t.kind] || t.kind}${t.ref_id ? ' · linked to ' + esc(t.ref_id) : ''}</div>
-        <div style="margin-top:4px">${tagDetails(t) || '<span class="muted">No details yet</span>'}</div></div></div>
+      ${lot ? `<div><div class="facts"><div><span>Brand</span><b>${esc(t.brand || '—')}</b></div><div><span>Product type</span><b>${esc(t.product_type || '—')}</b></div>
+          <div><span>Supplier</span><b>${esc(t.supplier || '—')}</b></div><div><span>Date</span><b>${dmy(t.lot_date) || '—'}</b></div></div>${countsHtml(t)}
+          ${treatText(t) ? `<div class="muted" style="margin-top:6px;font-size:12.5px">🧺 ${esc(treatText(t))}</div>` : ''}</div>`
+        : `<div><b style="font-size:16px">${t.label ? esc(t.label) : TAG_KINDS[t.kind]}</b><div class="muted">${TAG_KINDS[t.kind] || t.kind}${t.ref_id ? ' · linked to ' + esc(t.ref_id) : ''}</div><div style="margin-top:4px">${tagDetails(t) || ''}</div></div>`}</div>
     <div class="tagnow"><div><span class="muted">Now:</span> ${stagePill(t.stage)} ${t.location ? `<b>📍 ${esc(t.location)}</b>` : ''}</div>
       <div class="muted" style="margin-top:4px">Last scanned <b style="font-size:13px;color:var(--ink)">${since(t.last_scan_at)}</b> — ${fullTime(t.last_scan_at)}${t.note ? ` · “${esc(t.note)}”` : ''}</div></div>
-    <h2 style="margin:4px 0 0">Move it along the journey</h2>
-    <div class="brandbtns" id="stageBtns">${allStages.map(st => `<button type="button" class="btn ${st === stage ? '' : 'ghost'} sm" data-stage="${esc(st)}">${esc(st)}</button>`).join('')}</div>
-    <div class="row"><label>Where is it now?<select name="loc">${[...new Set([t.location, ...locs].filter(Boolean))].map(l => `<option ${l === t.location ? 'selected' : ''}>${esc(l)}</option>`).join('')}<option value="">— other / not set —</option></select></label>
-      <label>Note <span style="font-weight:400">(optional)</span><input name="note" data-nokeep placeholder="e.g. loaded on Daewoo truck"></label></div>
-    <details style="margin:4px 0 12px"><summary><b>✎ Edit details</b></summary>${tagFieldsHtml(t)}<button type="button" class="btn ghost sm" id="saveDetails">Save details</button></details>
-    <h2 style="margin:6px 0 10px">History <span class="muted" style="font-weight:400">(${scans.length} scan${scans.length === 1 ? '' : 's'})</span></h2>
+    <h2 style="margin:4px 0 0">Select action</h2>
+    <div class="seg"><button type="button" class="on" data-mode="move">📍 Update where it is</button>${lot ? '<button type="button" data-mode="treat">🧺 Treatment</button>' : ''}</div>
+    <div id="pMove"><div class="brandbtns" style="margin-top:0">${allStages.map(st => `<button type="button" class="btn ${st === stage ? '' : 'ghost'} sm" data-stage="${esc(st)}">${esc(st)}</button>`).join('')}</div>
+      <div class="row"><label>Where is it now?<select name="loc">${[...new Set([t.location, ...locs].filter(Boolean))].map(l => `<option ${l === t.location ? 'selected' : ''}>${esc(l)}</option>`).join('')}<option value="">— other / not set —</option></select></label>
+      <label>Note <span style="font-weight:400">(optional)</span><input name="note" data-nokeep placeholder="e.g. loaded on Daewoo truck"></label></div></div>
+    ${lot ? `<div id="pTreat" hidden><div class="brandbtns" style="margin-top:0"><button type="button" class="btn ${treat === 'washing' ? '' : 'ghost'} sm" data-treat="washing">Washing</button><button type="button" class="btn ${treat === 'mending' ? '' : 'ghost'} sm" data-treat="mending">Mending</button></div>
+      <div class="row"><label>Originally flagged<input type="number" name="flagged" min="0" value="${flaggedFor(treat)}"></label><label>Recovered<input type="number" name="recovered" min="0" value="${t[treat + '_recovered'] ?? ''}" placeholder="how many came back good"></label></div>
+      <label>Note <span style="font-weight:400">(optional)</span><input name="tnote" data-nokeep></label></div>` : ''}
+    ${lot ? `<details style="margin:4px 0 12px"><summary><b>✎ Edit details</b></summary>${lotFieldsHtml(t)}<button type="button" class="btn ghost sm" id="saveDetails">Save details</button></details>` : ''}
+    <h2 style="margin:6px 0 10px">History <span class="muted" style="font-weight:400">(${scans.length} update${scans.length === 1 ? '' : 's'})</span></h2>
     <ul class="tl">${scans.map(x => `<li><a href="#" class="x2" data-rm="${x.i}" title="Remove this entry">×</a><div class="when">${fullTime(x.at)} · ${since(x.at)}</div>
-      <div>${stagePill(x.stage)} ${x.location ? '📍 ' + esc(x.location) : ''}</div>${x.note ? `<div class="muted" style="font-size:12.5px">${esc(x.note)}</div>` : ''}</li>`).join('')}</ul>`,
+      <div>${x.treatment ? `<span class="pill p-new">🧺 ${esc(x.treatment)}</span>` : stagePill(x.stage)} ${x.location && !x.treatment ? '📍 ' + esc(x.location) : ''}</div>${x.note ? `<div class="muted" style="font-size:12.5px">${esc(x.note)}</div>` : ''}</li>`).join('')}</ul>`,
     async f => {
-      await rpc('scan_barcode_tag', {p_code: t.code, p_stage: stage, p_location: f.loc.value, p_note: f.note.value});
-      toast(`✓ ${t.code} → ${stage}${f.loc.value ? ' · ' + f.loc.value : ''}`);
-    }, '✓ Save scan', 'tag');
+      if (mode === 'treat') {
+        if (f.flagged.value === '' || f.recovered.value === '') return 'Enter originally flagged and recovered';
+        await rpc('record_lot_treatment', {p_code: t.code, p_treatment: treat, p_flagged: Math.round(+f.flagged.value), p_recovered: Math.round(+f.recovered.value), p_note: f.tnote.value});
+        toast(`✓ ${t.code} — ${treat}: ${f.recovered.value} of ${f.flagged.value} recovered`);
+      } else {
+        await rpc('scan_barcode_tag', {p_code: t.code, p_stage: stage, p_location: f.loc.value, p_note: f.note.value});
+        toast(`✓ ${t.code} → ${stage}${f.loc.value ? ' · ' + f.loc.value : ''}`);
+      }
+    }, '✓ Save', 'tag');
   barcodeSvg(t.code, {height: 54}).then(svg => { const el = f.querySelector('#tagBc'); if (el) el.innerHTML = svg; }).catch(() => {});
   f.querySelectorAll('[data-stage]').forEach(b => b.onclick = () => { stage = b.dataset.stage; f.querySelectorAll('[data-stage]').forEach(x => x.classList.toggle('ghost', x !== b)); });
-  wireTagFields(f);
-  f.querySelector('#saveDetails').onclick = async () => {
-    try { await rpc('update_barcode_tag', {p_code: t.code, ...tagArgs(f)}); toast('Details saved'); await refresh(); openTag(t.code); }
-    catch (e) { f.querySelector('.err').textContent = e.message; }
-  };
+  f.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+    mode = b.dataset.mode;
+    f.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x === b));
+    f.querySelector('#pMove').hidden = mode !== 'move';
+    if (f.querySelector('#pTreat')) f.querySelector('#pTreat').hidden = mode !== 'treat';
+    f.querySelector('[type=submit]').textContent = mode === 'treat' ? '✓ Save treatment' : '✓ Save';
+  });
+  f.querySelectorAll('[data-treat]').forEach(b => b.onclick = () => {
+    treat = b.dataset.treat;
+    f.querySelectorAll('[data-treat]').forEach(x => x.classList.toggle('ghost', x !== b));
+    f.flagged.value = flaggedFor(treat); f.recovered.value = t[treat + '_recovered'] ?? '';
+  });
+  if (lot) {
+    const sum1 = () => { f.querySelector('#lotTotal').textContent = lotVals(f).total; };
+    f.querySelector('details').addEventListener('input', sum1); sum1();
+    f.querySelector('#saveDetails').onclick = async () => {
+      try { await rpc('update_lot_tag', {p_code: t.code, ...lotArgs(lotVals(f))}); toast('Details saved'); await refresh(); openTag(t.code); }
+      catch (e) { f.querySelector('.err').textContent = e.message; }
+    };
+  }
   f.querySelectorAll('[data-rm]').forEach(a => a.onclick = async e => {
     e.preventDefault();
     if (!confirm('Remove this entry from the history?')) return;
@@ -1263,7 +1319,7 @@ function openTag(code) {
   btns.insertAdjacentHTML('afterbegin', `<button type="button" class="btn red" id="delTag">Delete</button><button type="button" class="btn ghost" id="printTag">🖨 Print</button>`);
   f.querySelector('#printTag').onclick = () => ACT.printTags(t.code);
   f.querySelector('#delTag').onclick = async () => {
-    if (!confirm(`Delete label ${t.code} and its history? This can't be undone.`)) return;
+    if (!confirm(`Delete ${t.code} and its history? This can't be undone.`)) return;
     try { await rpc('delete_barcode_tag', {p_code: t.code}); tagPicked.delete(t.code); $('#modal').hidden = true; toast(`${t.code} deleted`); refresh(); }
     catch (e) { f.querySelector('.err').textContent = e.message; }
   };
@@ -1275,18 +1331,22 @@ async function printLabels(codes, size) {
   if (!w) return toast('Allow pop-ups for this site to print labels');
   w.document.write('<p style="font:16px system-ui;padding:30px">Preparing labels…</p>');
   try {
-    const items = await Promise.all(codes.map(async c => ({t: tagBy(c), svg: await barcodeSvg(c, {height: 60, fontSize: 18})})));
     const thermal = size === 'thermal';
+    const items = await Promise.all(codes.map(async c => ({t: tagBy(c), svg: await barcodeSvg(c, {height: 60, fontSize: 18})})));
     const css = thermal
-      ? '@page{size:50mm 30mm;margin:0}body{margin:0}.lab{width:50mm;height:30mm;padding:1.6mm 2.2mm;page-break-after:always;break-after:page}.bc svg{height:14.5mm}'
-      : '@page{size:A4;margin:10mm 7mm}body{margin:0}.sheet{display:grid;grid-template-columns:repeat(3,63.5mm);grid-auto-rows:33.9mm;column-gap:2.5mm}.lab{border:.2mm dashed #ccc;padding:2mm 3mm}.bc svg{height:15mm}';
+      ? '@page{size:50mm 30mm;margin:0}body{margin:0}.lab{width:50mm;height:30mm;padding:1.2mm 2mm;page-break-after:always;break-after:page}.bc svg{height:12.5mm}'
+      : '@page{size:A4;margin:10mm 7mm}body{margin:0}.sheet{display:grid;grid-template-columns:repeat(3,63.5mm);grid-auto-rows:33.9mm;column-gap:2.5mm}.lab{border:.2mm dashed #ccc;padding:1.5mm 2.5mm}.bc svg{height:13mm}';
+    const lines = t => !t ? ['', '', ''] : isLot(t)
+      ? [`${t.brand || ''} · ${t.product_type || ''}`, `${t.supplier || ''}${t.lot_date ? ' · ' + dmy(t.lot_date) : ''}`, `A ${t.count_a || 0} · W ${t.count_washing || 0} · M ${t.count_mending || 0} · D ${t.count_damaged || 0} · Total ${lotTotal(t)}`]
+      : [t.label || TAG_KINDS[t.kind] || '', '', [t.category, t.grade, t.qty != null ? t.qty + ' pcs' : '', t.brand].filter(Boolean).join(' · ')];
     w.document.open();
     w.document.write(`<!doctype html><title>Labels</title><style>*{box-sizing:border-box}body{font-family:system-ui,sans-serif;color:#000}
       .lab{display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;text-align:center}
-      .biz{font-size:7pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase}.bc{width:100%}.bc svg{width:100%;display:block}
-      .txt{font-size:7.5pt;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;margin-top:.6mm}.meta{font-size:6.5pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}${css}</style>
-      <div class="sheet">${items.map(({t, svg}) => `<div class="lab"><div class="biz">${esc(S.settings.bizName)}</div><div class="bc">${svg}</div>
-        <div class="txt">${esc(t?.label || TAG_KINDS[t?.kind] || '')}</div><div class="meta">${t ? tagDetails(t) : ''}</div></div>`).join('')}</div>
+      .biz{font-size:6.5pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase}.bc{width:100%}.bc svg{width:100%;display:block}
+      .l1{font-size:7.5pt;font-weight:700;margin-top:.5mm}.l2,.l3{font-size:6.5pt}.l3{font-weight:600}
+      .l1,.l2,.l3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;line-height:1.25}${css}</style>
+      <div class="sheet">${items.map(({t, svg}) => { const [a, b, c] = lines(t); return `<div class="lab"><div class="biz">${esc(S.settings.bizName)}</div><div class="bc">${svg}</div>
+        <div class="l1">${esc(a)}</div>${b ? `<div class="l2">${esc(b)}</div>` : ''}<div class="l3">${esc(c)}</div></div>`; }).join('')}</div>
       <script>setTimeout(() => print(), 350)<\/script>`);
     w.document.close();
   } catch (e) { w.close(); toast(e.message); }
@@ -1626,20 +1686,28 @@ const ACT = {
   },
   openTag(code) { openTagByCode(code); },
   newTags() {
-    if (!S.tagsReady) { toast('Run supabase/007_barcode_tracking.sql in Supabase first'); return; }
+    if (!S.tagsReady) { toast('Run the barcode database steps (007 and 008) in Supabase first'); return; }
     const stages = S.settings.tagStages, locs = S.settings.tagLocations;
-    const f = modal('Create barcode labels', `<div class="row"><label>How many labels?<input type="number" name="count" min="1" max="200" value="1" required></label>
-        <label>Starting step<select name="stage">${stages.map(st => `<option>${esc(st)}</option>`).join('')}</select></label></div>
-      ${tagFieldsHtml()}
-      <label>Where is it now?<select name="loc">${locs.map(l => `<option>${esc(l)}</option>`).join('')}<option value="">— not set —</option></select></label>
-      <p class="muted" style="margin:0">Each label gets its own code (LND-000001, LND-000002…). With more than one, every label gets the same details — edit any of them later.</p>`,
+    let manual = false;
+    const f = modal('New barcode', `${lotFieldsHtml()}
+      <label class="codeprev">Item code <span style="font-weight:400">— made from the details above, you can change it</span><input name="code" class="mono" autocomplete="off" required></label>
+      <div class="row"><label>Starting step<select name="stage">${stages.map(st => `<option>${esc(st)}</option>`).join('')}</select></label>
+        <label>Where is it now?<select name="loc">${locs.map(l => `<option>${esc(l)}</option>`).join('')}<option value="">— not set —</option></select></label></div>`,
       async f => {
-        const n = Math.round(+f.count.value);
-        if (!(n >= 1 && n <= 200)) return 'Make between 1 and 200 labels at a time';
-        const codes = await rpc('create_barcode_tags', {p_count: n, ...tagArgs(f), p_stage: f.stage.value, p_location: f.loc.value});
-        setTimeout(() => ACT.printTags(codes.join(',')), 60);
-      }, 'Create labels');
-    wireTagFields(f);
+        const v = lotVals(f);
+        if (!v.brand || !v.type || !v.supplier) return 'Fill in brand, product type and supplier';
+        if (!v.total) return 'Enter at least one piece count';
+        const code = await rpc('create_lot_tag', {p_code: f.code.value, ...lotArgs(v), p_stage: f.stage.value, p_location: f.loc.value});
+        toast(`✓ Saved ${code}${code !== normCode(f.code.value) ? ' (that code was taken, so a number was added)' : ''}`, 4000);
+        setTimeout(() => ACT.printTags(code), 60);
+      }, 'Save & print barcode');
+    const upd = e => {
+      if (e?.target?.name === 'code') { manual = !!f.code.value.trim(); return; }
+      const v = lotVals(f);
+      f.querySelector('#lotTotal').textContent = v.total;
+      if (!manual) f.code.value = lotCode(v);
+    };
+    f.addEventListener('input', upd); f.addEventListener('change', upd); upd();
   },
   printTags(codes) {
     const list = (codes ? String(codes).split(',') : [...tagPicked]).filter(Boolean);
@@ -1715,7 +1783,9 @@ const ACT = {
       bales: [['ID', 'Date', 'Supplier', 'Type', 'Kg', 'Cost', 'Status', 'Pieces'], S.bales.map(b => [b.id, b.date, b.supplier, b.type, b.weightKg, b.cost, b.status, sum(Object.values(b.yield), q => q)])],
       inventory: [['Category', 'Grade', 'Qty', 'Min', 'Price', 'Value'], Object.entries(S.stock).map(([k, s]) => [...k.split('|'), s.qty, s.min, s.price, s.qty * s.price])],
       orders: [['ID', 'Date', 'Wholesaler', 'City', 'Items', 'Pieces', 'Total', 'Paid', 'Due', 'Status', 'Courier', 'Tracking'], S.orders.map(o => [o.id, o.date, cust(o.customerId).name, cust(o.customerId).city, o.lines.map(l => `${label(l.key)} x${l.qty}`).join('; '), sum(o.lines, l => l.qty), total(o), o.paid, due(o), o.status, o.courier || '', o.tracking || ''])],
-      tags: [['Code', 'Label', 'Type', 'Linked to', 'Category', 'Grade', 'Pieces', 'Brand', 'Step', 'Where', 'Last scan', 'Scans'], S.tags.map(t => [t.code, t.label, TAG_KINDS[t.kind] || t.kind, t.ref_id || '', t.category || '', t.grade || '', t.qty ?? '', t.brand || '', t.stage, t.location, fullTime(t.last_scan_at), (t.scans || []).length])],
+      tags: [['Item code', 'Brand', 'Product type', 'Supplier', 'Date', 'A', 'Washing', 'Mending', 'Damaged', 'Total', 'Washing flagged', 'Washing recovered', 'Mending flagged', 'Mending recovered', 'Step', 'Where', 'Last scan', 'Updates'],
+        S.tags.map(t => [t.code, t.brand || '', t.product_type || t.label || '', t.supplier || '', dmy(t.lot_date), t.count_a || 0, t.count_washing || 0, t.count_mending || 0, t.count_damaged || 0, isLot(t) ? lotTotal(t) : t.qty ?? '',
+          t.washing_flagged ?? '', t.washing_recovered ?? '', t.mending_flagged ?? '', t.mending_recovered ?? '', t.stage, t.location, fullTime(t.last_scan_at), (t.scans || []).length])],
       customers: [['ID', 'Name', 'City', 'Phone', 'Credit limit', 'Owes'], S.customers.map(c => [c.id, c.name, c.city, c.phone, c.limit, custDue(c.id)])],
     }[what];
     const csv = [T2[0], ...T2[1]].map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -1818,7 +1888,7 @@ document.addEventListener('keydown', e => {
   const now = performance.now();
   if (e.key === 'Enter') {
     const code = scanBuf; scanBuf = '';
-    if (/^LND-?\d{1,6}$/i.test(code)) { e.preventDefault(); e.stopPropagation(); setTimeout(() => openTagByCode(code), 0); }
+    if (code.length >= 5 && /\d/.test(code) && /^[A-Z0-9-]+$/i.test(code)) { e.preventDefault(); e.stopPropagation(); setTimeout(() => openTagByCode(code), 0); }
     return;
   }
   if (e.key.length !== 1 || e.metaKey || e.ctrlKey || e.altKey) return;
