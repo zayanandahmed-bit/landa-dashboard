@@ -1326,27 +1326,20 @@ function openTag(code) {
   f.querySelector('[type=submit]').focus();   // a handheld scanner can confirm with its Enter key
 }
 
+// Label = just the barcode, with its item code printed underneath
 async function printLabels(codes, size) {
   const w = window.open('', '_blank');
   if (!w) return toast('Allow pop-ups for this site to print labels');
   w.document.write('<p style="font:16px system-ui;padding:30px">Preparing labels…</p>');
   try {
-    const thermal = size === 'thermal';
-    const items = await Promise.all(codes.map(async c => ({t: tagBy(c), svg: await barcodeSvg(c, {height: 60, fontSize: 18})})));
-    const css = thermal
-      ? '@page{size:50mm 30mm;margin:0}body{margin:0}.lab{width:50mm;height:30mm;padding:1.2mm 2mm;page-break-after:always;break-after:page}.bc svg{height:12.5mm}'
-      : '@page{size:A4;margin:10mm 7mm}body{margin:0}.sheet{display:grid;grid-template-columns:repeat(3,63.5mm);grid-auto-rows:33.9mm;column-gap:2.5mm}.lab{border:.2mm dashed #ccc;padding:1.5mm 2.5mm}.bc svg{height:13mm}';
-    const lines = t => !t ? ['', '', ''] : isLot(t)
-      ? [`${t.brand || ''} · ${t.product_type || ''}`, `${t.supplier || ''}${t.lot_date ? ' · ' + dmy(t.lot_date) : ''}`, `A ${t.count_a || 0} · W ${t.count_washing || 0} · M ${t.count_mending || 0} · D ${t.count_damaged || 0} · Total ${lotTotal(t)}`]
-      : [t.label || TAG_KINDS[t.kind] || '', '', [t.category, t.grade, t.qty != null ? t.qty + ' pcs' : '', t.brand].filter(Boolean).join(' · ')];
+    const svgs = await Promise.all(codes.map(c => barcodeSvg(c, {height: 80, fontSize: 20, textMargin: 4})));
+    const css = size === 'thermal'
+      ? '@page{size:50mm 30mm;margin:0}.lab{width:50mm;height:30mm;padding:2.5mm 3mm;page-break-after:always;break-after:page}'
+      : '@page{size:A4;margin:10mm 7mm}.sheet{display:grid;grid-template-columns:repeat(3,63.5mm);grid-auto-rows:33.9mm;column-gap:2.5mm}.lab{border:.2mm dashed #ccc;padding:3mm 4mm}';
     w.document.open();
-    w.document.write(`<!doctype html><title>Labels</title><style>*{box-sizing:border-box}body{font-family:system-ui,sans-serif;color:#000}
-      .lab{display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;text-align:center}
-      .biz{font-size:6.5pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase}.bc{width:100%}.bc svg{width:100%;display:block}
-      .l1{font-size:7.5pt;font-weight:700;margin-top:.5mm}.l2,.l3{font-size:6.5pt}.l3{font-weight:600}
-      .l1,.l2,.l3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;line-height:1.25}${css}</style>
-      <div class="sheet">${items.map(({t, svg}) => { const [a, b, c] = lines(t); return `<div class="lab"><div class="biz">${esc(S.settings.bizName)}</div><div class="bc">${svg}</div>
-        <div class="l1">${esc(a)}</div>${b ? `<div class="l2">${esc(b)}</div>` : ''}<div class="l3">${esc(c)}</div></div>`; }).join('')}</div>
+    w.document.write(`<!doctype html><title>Labels</title><style>*{box-sizing:border-box}body{margin:0}
+      .lab{display:flex;align-items:center;justify-content:center;overflow:hidden}.lab svg{width:100%;height:100%;display:block}${css}</style>
+      <div class="sheet">${svgs.map(svg => `<div class="lab">${svg}</div>`).join('')}</div>
       <script>setTimeout(() => print(), 350)<\/script>`);
     w.document.close();
   } catch (e) { w.close(); toast(e.message); }
