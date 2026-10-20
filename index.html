@@ -1776,19 +1776,17 @@ const ACT = {
   openTag(code) { openTagByCode(code); },
   newTags() {
     if (!S.tagsReady) { toast('Run the barcode database steps (007 and 008) in Supabase first'); return; }
-    const stages = S.settings.tagStages, locs = S.settings.tagLocations;
     let manual = false;
     const f = modal('New batch', `${lotFieldsHtml()}
       <label class="codeprev">Batch code <span style="font-weight:400">— made from the details above, you can change it</span><input name="code" class="mono" autocomplete="off" required></label>
       <label class="muted" style="display:flex;gap:8px;align-items:center;font-weight:500;margin:-2px 0 12px"><input type="checkbox" name="makePieces" checked style="width:auto;margin:0"> <span>Also make a barcode for every piece (<b id="pieceN">0</b>): <span class="mono" id="piecePrev"></span></span></label>
-      <div class="row"><label>Starting step<select name="stage">${stages.map(st => `<option>${esc(st)}</option>`).join('')}</select></label>
-        <label>Where is it now?<select name="loc">${locs.map(l => `<option>${esc(l)}</option>`).join('')}<option value="">— not set —</option></select></label></div>`,
+`,
       async f => {
         const v = lotVals(f);
         if (!v.brand || !v.type || !v.supplier) return 'Fill in brand, product type and supplier';
         if (!v.total) return 'Enter at least one piece count';
         if (f.makePieces.checked && v.total > 2000) return 'Up to 2000 piece barcodes per batch';
-        const r = await rpc('create_lot_tag', {p_code: f.code.value, ...lotArgs(v), p_stage: f.stage.value, p_location: f.loc.value, p_make_pieces: f.makePieces.checked});
+        const r = await rpc('create_lot_tag', {p_code: f.code.value, ...lotArgs(v), p_stage: S.settings.tagStages[0], p_location: '', p_make_pieces: f.makePieces.checked});
         toast(`✓ Saved batch ${r.batch}${r.pieces.length ? ` + ${r.pieces.length} piece barcodes` : ''}${r.batch !== normCode(f.code.value) ? ' (that code was taken, so a number was added)' : ''}`, 4500);
         setTimeout(() => printChooser([r.batch], r.pieces), 60);
       }, 'Save & print barcodes');
