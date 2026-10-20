@@ -56,6 +56,16 @@ Ask questions like "who owes me the most?" or "which supplier is worth buying fr
 - Default model is `claude-opus-5`. `claude-sonnet-5` is cheaper. With Opus, refusals are routed to a fallback model automatically.
 - Chats are kept in memory only, so closing the tab clears them.
 
+## Barcodes (journey tracking)
+
+The **Barcodes** tab makes printable labels (codes like `LND-000012`) for a bale, bundle, order or single item. Stick one on, then scan it at every step to record where it is.
+
+- Run `supabase/007_barcode_tracking.sql` once (it adds one table, `landa_clothing_wholesale_business_tracked_barcode_tags`).
+- **Printing:** works with a 50 × 30 mm sticker printer, or any printer with A4 sticker sheets (3 × 8 labels, 63.5 × 33.9 mm). Print at 100% / "Actual size".
+- **Scanning:** a USB or Bluetooth handheld scanner works on any page of the app. You can also use **Scan with camera** on a phone, or type the number into the scan box.
+- Each scan opens a pop-up showing the current step and place, when it was last scanned, and the full history. From there you can record the next step, edit the details, remove a wrong history entry, reprint the label or delete it.
+- Edit the steps and places in **Settings → Barcode journey**.
+
 ## Sensor boxes (ESP32)
 
 Create a box under **Settings → Sensor boxes** to get a device ID and secret key. The box then calls these two functions:
