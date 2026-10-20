@@ -558,7 +558,7 @@ function drawNav() {
   if (!S) return;
   const pg = route()[0];
   const n = alerts().filter(a => a.lvl !== 'info').length;
-  $('#nav').innerHTML = `<div class="brand">${MARK}<div><b>ReLoop</b><small>${esc(S.settings.bizName)}</small></div></div>` +
+  $('#nav').innerHTML = `<div class="brand">${MARK}<div><b>ReLoop</b><small>${S.settings.bizName.trim().toLowerCase() === 'reloop' ? 'Bale · Sort · Sell' : esc(S.settings.bizName)}</small></div></div>` +
     NAV.map(([id, t]) => `<a href="#${id}" class="nav ${pg === id ? 'on' : ''}"><svg viewBox="0 0 24 24">${ICON[id]}</svg>${t}${id === 'alerts' && n ? `<span class="badge">${n}</span>` : ''}${id === 'sorting' && S.live.baleId ? '<span class="badge live">LIVE</span>' : ''}</a>`).join('') +
     `<div class="foot"><span class="sync"><i class="${liveOK ? 'on' : ''}"></i>${liveOK ? 'Live sync' : 'Connecting…'}</span><a href="#" data-act="logout">Log out</a></div>`;
 }
