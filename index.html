@@ -1173,7 +1173,9 @@ function lotCode(v) {
 }
 const isPiece = t => !!t.batch_code;
 const isLot = t => !isPiece(t) && !!(t.product_type || t.supplier);
-const piecesOf = code => S.tags.filter(x => x.batch_code === code).sort((a, b) => a.code.localeCompare(b.code));
+const pieceNo = x => x.code.split('-').pop();   // piece codes end in their number: A-<batch>-07
+const pieceTag = x => (/^[AWMD]-/.test(x.code) ? x.code[0] + '-' : '') + pieceNo(x);
+const piecesOf = code => S.tags.filter(x => x.batch_code === code).sort((a, b) => +pieceNo(a) - +pieceNo(b));
 const COND = ['A', 'Washing', 'Mending', 'Damaged'], COND_CLS = {A: 'cA', Washing: 'cW', Mending: 'cM', Damaged: 'cD'};
 const condPill = c => c ? `<span class="pill" style="background:var(--${{A: 'okbg', Washing: 'infobg', Mending: 'warnbg', Damaged: 'dangerbg'}[c]});color:var(--${{A: 'ok', Washing: 'info', Mending: 'warn', Damaged: 'danger'}[c]})">${esc(c)}</span>` : '';
 function nowCounts(code) {
@@ -1289,7 +1291,7 @@ function openTag(code) {
     <div class="tagnow"><div><span class="muted">Now:</span> ${stagePill(t.stage)} ${t.location ? `<b>📍 ${esc(t.location)}</b>` : ''}</div>
       <div class="muted" style="margin-top:4px">Last scanned <b style="font-size:13px;color:var(--ink)">${since(t.last_scan_at)}</b> — ${fullTime(t.last_scan_at)}${t.note ? ` · “${esc(t.note)}”` : ''}</div></div>
     ${pieces.length ? `<h2 style="margin:4px 0 8px">Pieces <span class="muted" style="font-weight:400">(${pieces.length} — tap one to open it)</span></h2>
-      <div class="pgrid">${pieces.map(x => `<button type="button" class="pchip ${COND_CLS[x.condition] || ''}" data-piece="${esc(x.code)}" title="${esc(x.condition || '')} · ${esc(x.stage)}${x.location ? ' · ' + esc(x.location) : ''}">${esc(x.code.slice(t.code.length + 1))}</button>`).join('')}</div>` : ''}
+      <div class="pgrid">${pieces.map(x => `<button type="button" class="pchip ${COND_CLS[x.condition] || ''}" data-piece="${esc(x.code)}" title="${esc(x.condition || '')} · ${esc(x.stage)}${x.location ? ' · ' + esc(x.location) : ''}">${esc(pieceTag(x))}</button>`).join('')}</div>` : ''}
     <h2 style="margin:12px 0 0">Select action</h2>
     <div class="seg"><button type="button" class="on" data-mode="move">📍 Update where it is</button>${lot ? '<button type="button" data-mode="treat">🧺 Treatment</button>' : ''}</div>
     <div id="pMove"><div class="brandbtns" style="margin-top:0">${allStages.map(st => `<button type="button" class="btn ${st === stage ? '' : 'ghost'} sm" data-stage="${esc(st)}">${esc(st)}</button>`).join('')}</div>
@@ -1361,7 +1363,7 @@ function openPiece(t) {
   const stages = S.settings.tagStages, locs = S.settings.tagLocations;
   const allStages = stages.includes(t.stage) ? stages : [...stages, t.stage];
   let stage = t.stage, cond = t.condition;
-  const sibs = piecesOf(t.batch_code), no = t.code.slice(t.batch_code.length + 1);
+  const sibs = piecesOf(t.batch_code), no = pieceNo(t);
   const scans = (t.scans || []).map((x, i) => ({...x, i})).reverse();
   const f = modal(`<span class="mono">${esc(t.code)}</span>`, `
     <div class="batchlink"><div><span class="muted" style="font-size:12px">Belongs to batch</span><div class="mono">${esc(t.batch_code)}</div>
@@ -1797,7 +1799,9 @@ const ACT = {
       if (!manual) f.code.value = lotCode(v);
       const w = Math.max(2, String(v.total).length), c = normCode(f.code.value);
       f.querySelector('#pieceN').textContent = v.total;
-      f.querySelector('#piecePrev').textContent = v.total ? `${c}-${'1'.padStart(w, '0')} … ${c}-${String(v.total).padStart(w, '0')}` : '';
+      let k = 0;
+      f.querySelector('#piecePrev').textContent = [['A', v.a], ['W', v.w], ['M', v.m], ['D', v.d]].filter(([, n]) => n)
+        .map(([L, n]) => { const a = k + 1; k += n; return `${L}-${c}-${String(a).padStart(w, '0')}${n > 1 ? '…' + String(k).padStart(w, '0') : ''}`; }).join('  ');
     };
     f.addEventListener('input', upd); f.addEventListener('change', upd); upd();
   },
