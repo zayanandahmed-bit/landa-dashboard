@@ -1160,8 +1160,8 @@ function stagePill(st) {
   return `<span class="pill ${cls}">${esc(st)}</span>`;
 }
 // The readable item code, built like the owner's sheet:
-// supplier initials + brand + product type + date (DDMMYYYY) + W<washing> - <total>
-// e.g. Abdul Kareem · Patagonia · Fleece Jackets · 2 Oct 2026 · W30 · 64 pcs -> AKPFJ02102026W30-64
+// supplier initials + brand + product type + date (DDMMYYYY) - <total>
+// e.g. Abdul Kareem · Patagonia · Fleece Jackets · 2 Oct 2026 · 64 pcs -> AKPFJ02102026-64
 function initialsOf(text, single) {
   const w = String(text || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
   if (!w.length) return '';
@@ -1169,7 +1169,7 @@ function initialsOf(text, single) {
 }
 function lotCode(v) {
   const [y, m, d] = String(v.date || '').split('-');
-  return initialsOf(v.supplier, 2) + initialsOf(v.brand, 1) + initialsOf(v.type, 2) + (y ? d + m + y : '') + 'W' + (v.w || 0) + '-' + v.total;
+  return initialsOf(v.supplier, 2) + initialsOf(v.brand, 1) + initialsOf(v.type, 2) + (y ? d + m + y : '') + '-' + v.total;
 }
 const isPiece = t => !!t.batch_code;
 const isLot = t => !isPiece(t) && !!(t.product_type || t.supplier);
