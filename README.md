@@ -1,4 +1,4 @@
-# Landa Dashboard
+# ReLoop
 
 Business dashboard for a landa clothing wholesale business. It covers the whole flow: **bale in → sort → stock → order → dispatch → paid**.
 
@@ -32,7 +32,7 @@ Business dashboard for a landa clothing wholesale business. It covers the whole 
 Emails are sent **from your own Gmail** by a small Google Apps Script (`email-robot/Code.gs`), so no email password is stored anywhere.
 
 1. Run `supabase/002_email_alerts.sql` in the Supabase SQL editor. Fresh installs already have it in `setup.sql`.
-2. Sign in to Google as **zayantechtricks@gmail.com** and open https://script.google.com. Click **New project** and name it "Landa email robot".
+2. Sign in to Google as **zayantechtricks@gmail.com** and open https://script.google.com. Click **New project** and name it "ReLoop email robot".
 3. Delete what's in `Code.gs` and paste in `email-robot/Code.gs` from this repo. Save.
 4. Pick `setup` in the function dropdown and press **Run**. Allow the permissions it asks for (sending email, and connecting to external services and triggers).
 5. Click **Deploy → New deployment**, choose the type **Web app**, and set:

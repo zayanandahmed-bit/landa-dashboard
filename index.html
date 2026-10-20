@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Landa Dashboard</title>
+<title>ReLoop</title>
 <meta name="theme-color" content="#ffffff">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -316,7 +316,7 @@ body.revealing{--rise0:280ms}
 <div id="lock" hidden><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
   <form id="lockForm">
     <svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="mgl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2dd4bf"/><stop offset="1" stop-color="#0e7490"/></linearGradient></defs><rect width="64" height="64" rx="17" fill="url(#mgl)"/><path class="hang" pathLength="1" d="M26 22a6 6 0 1 1 7.2 5.9c-1 .2-1.2.8-1.2 1.7V32M32 32 14 44h36Z" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <h1>Landa Dashboard</h1>
+    <h1>ReLoop</h1>
     <p class="muted">Enter your password to continue</p>
     <input type="password" name="pw" autocomplete="current-password" placeholder="Password" required>
     <button class="btn">Unlock</button>
@@ -558,7 +558,7 @@ function drawNav() {
   if (!S) return;
   const pg = route()[0];
   const n = alerts().filter(a => a.lvl !== 'info').length;
-  $('#nav').innerHTML = `<div class="brand">${MARK}<div><b>${esc(S.settings.bizName)}</b><small>Bale · Sort · Sell</small></div></div>` +
+  $('#nav').innerHTML = `<div class="brand">${MARK}<div><b>ReLoop</b><small>${esc(S.settings.bizName)}</small></div></div>` +
     NAV.map(([id, t]) => `<a href="#${id}" class="nav ${pg === id ? 'on' : ''}"><svg viewBox="0 0 24 24">${ICON[id]}</svg>${t}${id === 'alerts' && n ? `<span class="badge">${n}</span>` : ''}${id === 'sorting' && S.live.baleId ? '<span class="badge live">LIVE</span>' : ''}</a>`).join('') +
     `<div class="foot"><span class="sync"><i class="${liveOK ? 'on' : ''}"></i>${liveOK ? 'Live sync' : 'Connecting…'}</span><a href="#" data-act="logout">Log out</a></div>`;
 }
@@ -602,7 +602,7 @@ function splashMarkup() {
   return `<div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div><div class="sp-ring"></div>
   <div class="sp-inner">
     <div class="sp-logo"><div class="sp-halo"></div>${sparks}${MARK.replace('class="mark"', 'class="sp-mark"')}</div>
-    <div class="sp-name">${[...'LANDA'].map((c, k) => `<span style="--k:${k}">${c}</span>`).join('')}</div>
+    <div class="sp-name">${[...'RELOOP'].map((c, k) => `<span style="--k:${k}">${c}</span>`).join('')}</div>
     <div class="sp-tag">Bale · Sort · Sell</div>
     <div class="sp-stage">
       ${SP_BINS.map(([g, c, dx], k) => `<div class="sp-bin" id="spBin${g}" style="--c:${c};--dx:${dx}px;--k:${k}"><b>0</b><small>GRADE ${g}</small></div>`).join('')}

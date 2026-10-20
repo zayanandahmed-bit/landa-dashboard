@@ -1,5 +1,5 @@
 /**
- * Landa Dashboard — Email robot (Google Apps Script)
+ * ReLoop — Email robot (Google Apps Script)
  *
  * Sends alert emails FROM the Google account that owns this script
  * (zayantechtricks@gmail.com) to the addresses set in the dashboard's
@@ -37,7 +37,7 @@ function installTriggers_() {
 
 /* ---------- web app: called by the dashboard ---------- */
 function doGet() {
-  return ContentService.createTextOutput('Landa email robot is running ✓');
+  return ContentService.createTextOutput('ReLoop email robot is running ✓');
 }
 
 function doPost(e) {
